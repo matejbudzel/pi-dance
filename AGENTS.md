@@ -1,0 +1,108 @@
+# AGENTS.md
+
+## Product goal
+
+Build the smallest useful kid-friendly DDR-style game that can validate whether the dance pad is fun enough to justify further work.
+
+Prefer a working, understandable MVP over completeness or abstraction.
+
+## Platform contract
+
+- Primary deployment target: Raspberry Pi 1 B+ with 256 MB RAM.
+- Primary development surface: desktop macOS and Linux.
+- Python + Pygame is the default implementation stack.
+- Do not make the Raspberry Pi the normal development loop.
+- Do not introduce Raspberry-Pi-specific architecture unless profiling on the real device demonstrates a need.
+- Keep platform-specific display, joystick and latency configuration isolated from core game logic.
+
+The public repository `matejbudzel/pi-286-games` is the authoritative operational reference for the target Pi/DietPi hardware and display setup. Reuse its hardware knowledge where appropriate, but do not copy DOSBox-specific constraints into this application.
+
+## Input contract
+
+Keyboard input is a first-class controller, not a fallback.
+
+Every MVP action must work both from the keyboard and from the dance pad through a shared action model.
+
+Canonical actions:
+
+- LEFT
+- RIGHT
+- UP
+- DOWN
+- START
+- SELECT
+
+Default keyboard mapping:
+
+- Arrow keys -> directions
+- Enter or Space -> START
+- Escape -> SELECT
+
+Do not let game states depend directly on raw Pygame key or joystick events. Translate device input into game actions first.
+
+## Display contract
+
+- Application canvas: 854x480.
+- Menus, HUD, text and results render natively at 854x480.
+- Gameplay art may render to a lower-resolution logical surface and scale up using integer nearest-neighbour scaling.
+- Do not force UI text through the low-resolution gameplay surface.
+- 1280x720 output should center the 854x480 application canvas 1:1 with borders rather than introduce a second responsive layout.
+
+## Performance approach
+
+Target smooth 30 FPS on Raspberry Pi 1 B+.
+
+Prefer simple portable code first. Do not pre-emptively add custom framebuffer code, C extensions, NumPy pixel pipelines, custom audio threads or similar complexity.
+
+Avoid obviously expensive runtime work:
+
+- no per-frame filesystem access
+- no runtime image decoding during songs
+- no unnecessary full-screen alpha effects
+- preload small assets
+- keep gameplay sprites simple
+
+Profile on the actual Pi before optimizing further.
+
+## Timing contract
+
+Audio playback is the authoritative song clock. Never derive note timing from frame count.
+
+Charts should be parsed into a format independent of StepMania source syntax, ideally absolute note timestamps plus direction/type.
+
+Support configurable timing offsets for real-device calibration.
+
+## Song content
+
+Do not commit copyrighted audio or downloaded community charts.
+
+Songs live in an external configurable directory as metadata + WAV + chart bundles.
+
+The repository may contain synthetic/example metadata and charts only when they are safe to redistribute.
+
+## Scope discipline
+
+Do not implement these unless the current task explicitly requires them:
+
+- persistent high scores
+- accounts/profiles
+- multiplayer
+- combo systems
+- fail/life mechanics
+- online services
+- cover art/video backgrounds
+- lyrics
+- MP3 decoding
+- chart editor
+- auto-chart generation
+- exhaustive StepMania compatibility
+- settings UI
+
+When integrating community charts, support the smallest useful subset of the format that handles the selected Beginner/Easy songs.
+
+## Code style
+
+- Keep modules small and responsibilities obvious.
+- Prefer plain functions/dataclasses and simple state objects over framework-heavy patterns.
+- Keep game logic testable without a physical dance pad or Raspberry Pi.
+- Comments in source code should be in English.
