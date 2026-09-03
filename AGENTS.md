@@ -40,6 +40,48 @@ Default keyboard mapping:
 
 Do not let game states depend directly on raw Pygame key or joystick events. Translate device input into game actions first.
 
+## UI contract
+
+The MVP is intentionally text-light.
+
+Normal player-facing text should be limited to:
+
+- the game title on the splash screen
+- song titles in the song-selection screen
+
+Do not add explanatory labels such as `START`, `SELECT`, `PAUSED`, `GREAT`, `MISS`, `SONG COMPLETE`, percentages or control instructions unless explicitly requested later.
+
+Prefer icons, highlights, progress bars and simple symbols over written explanations.
+
+### Song selection
+
+- Song titles are left-aligned.
+- All song titles begin on the same fixed x coordinate.
+- The current selection is shown with a chevron in a separate fixed column to the left of the song titles.
+- Up/Down moves the chevron vertically along a single x axis.
+- Do not horizontally shift the chevron or song titles based on title length.
+
+### Step judgement feedback
+
+Each judged note must produce immediate non-textual feedback using one of three reaction images:
+
+- heart -> best / very good hit
+- thumbs-up -> acceptable hit
+- shrug -> miss / poor hit
+
+These icons are the normal in-game judgement feedback. Do not duplicate them with textual judgement labels.
+
+Keep the implementation simple: preload the assets and briefly show the latest judgement before it disappears or is replaced by the next one.
+
+### Result screen
+
+- Show a simple final 1-5 star result.
+- Celebrate song completion regardless of performance.
+- Do not show a fail state.
+- Do not auto-dismiss the result screen.
+- The result remains visible indefinitely until the player explicitly presses START or SELECT.
+- START and SELECT both return to the song list in the MVP.
+
 ## Display contract
 
 - Application canvas: 854x480.
@@ -97,6 +139,7 @@ Do not implement these unless the current task explicitly requires them:
 - auto-chart generation
 - exhaustive StepMania compatibility
 - settings UI
+- text-heavy tutorial or judgement UI
 
 When integrating community charts, support the smallest useful subset of the format that handles the selected Beginner/Easy songs.
 
