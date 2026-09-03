@@ -20,6 +20,55 @@ BOOT -> SPLASH -> SONG SELECT -> PLAYING <-> PAUSED -> RESULT -> SONG SELECT
 - Select / Escape returns to the song list.
 - Every completed song ends with a small celebratory result screen, regardless of score.
 - Results are expressed as a simple star rating. No persistent high scores in the MVP.
+- The result screen never auto-dismisses. It remains visible until the player explicitly presses Start or Select, after which the game returns to the song list.
+
+## UI philosophy
+
+The player-facing MVP UI should use as little text as possible.
+
+The only required text is:
+
+- the game title on the splash screen
+- song titles in the song list
+
+Do not add labels such as `START`, `SELECT`, `PAUSED`, `GREAT`, `MISS`, `SONG COMPLETE`, percentages, instructions or other explanatory text unless later user testing demonstrates a need.
+
+Navigation, progress and feedback should be communicated with layout, icons, highlights and simple symbols instead of words.
+
+### Song list
+
+The song list is left-aligned. Each song title begins on the same vertical text axis.
+
+The currently selected song is indicated by a chevron placed in a fixed column to the left of the titles. Moving Up/Down moves only the chevron vertically; it should not shift horizontally because of varying song-title lengths.
+
+Conceptually:
+
+```text
+  > Love Story
+    Let It Go
+    Shake It Off
+    Into the Unknown
+```
+
+The exact spacing and styling can evolve, but the fixed left alignment and single chevron axis are part of the MVP interaction design.
+
+### In-game step feedback
+
+Each judged step produces immediate visual feedback using one of three small reaction images:
+
+- heart: best / very good hit
+- thumbs-up: acceptable hit
+- shrug: missed or poor hit
+
+These are the primary in-game judgement indicators. Do not duplicate them with textual labels in the normal player UI.
+
+The most recent reaction may remain visible briefly after judgement before disappearing or being replaced by the next one. The exact timing can be tuned during playtesting.
+
+### Result screen
+
+The result screen shows the final star rating and a small celebratory visual/fanfare regardless of performance. It should not display a failure state.
+
+The result screen is modal: it remains on screen indefinitely until Start or Select is pressed. There is no timeout and no automatic return to the song list.
 
 ## Display model
 
@@ -98,6 +147,8 @@ Audio playback is the timing authority. Note timing must not depend on rendered 
 
 The MVP needs only a small scoring model such as hits, misses and total notes, converted to a friendly 1-5 star result. There is no fail state: finishing the song is always celebrated.
 
+The internal hit-quality model should be small and map directly to the three visual reaction assets, for example `great`, `ok` and `miss` -> heart, thumbs-up and shrug.
+
 Global audio/input timing offsets should be configurable so HDMI/display/input latency can be tuned on the real Raspberry Pi setup.
 
 ## Non-goals for the first MVP
@@ -117,6 +168,7 @@ Global audio/input timing offsets should be configurable so HDMI/display/input l
 - exhaustive StepMania compatibility
 - touchscreen/mouse-first UI
 - settings UI
+- text-heavy instructions or judgement labels
 
 ## Development
 
