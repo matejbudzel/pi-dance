@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pi-dance"
+version = "0.1.0"
+description = "A tiny DDR-style rhythm game for Raspberry Pi 1 B+"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pygame>=2.5,<3",
+]
+
+[project.scripts]
+pi-dance = "pi_dance.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
