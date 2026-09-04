@@ -309,6 +309,7 @@ class App:
         previous_clip = self.screen.get_clip()
         self.screen.set_clip(pygame.Rect(0, 92, APP_WIDTH, APP_HEIGHT - 92))
         song_time = self._song_position_seconds()
+        has_visible_note = False
         for note in self.session.pending:
             seconds_until_note = note.timestamp - song_time
             if not -0.25 <= seconds_until_note <= NOTE_TRAVEL_SECONDS:
@@ -316,8 +317,23 @@ class App:
             lane = ("left", "down", "up", "right").index(note.direction)
             y = 132 + seconds_until_note * (APP_HEIGHT + 16 - 132) / NOTE_TRAVEL_SECONDS
             arrow = self.flow_arrows[note.direction]
-            self.screen.blit(arrow, arrow.get_rect(center=(APP_WIDTH // 2 - 142 + lane * 84, round(y))))
+            if 92 <= y <= APP_HEIGHT + 16:
+                self.screen.blit(arrow, arrow.get_rect(center=(APP_WIDTH // 2 - 142 + lane * 84, round(y))))
+                has_visible_note = True
+        if not has_visible_note:
+            self._render_next_note_marker(song_time)
         self.screen.set_clip(previous_clip)
+
+    def _render_next_note_marker(self, song_time: float) -> None:
+        if self.session is None:
+            return
+        next_note = next((note for note in self.session.pending if note.timestamp > song_time), None)
+        if next_note is None:
+            return
+        lane = ("left", "down", "up", "right").index(next_note.direction)
+        center_x = APP_WIDTH // 2 - 142 + lane * 84
+        for offset, color in zip((-5, 0, 5), ((255, 75, 125), (255, 225, 70), (55, 225, 255))):
+            pygame.draw.circle(self.screen, color, (center_x + offset, APP_HEIGHT - 14), 3)
 
     def _render_feedback(self) -> None:
         if self.feedback is None or self._song_position_seconds() > self.feedback_until:
