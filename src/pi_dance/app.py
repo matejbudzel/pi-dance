@@ -21,6 +21,9 @@ class Screen(Enum):
     SONG_EXIT_CONFIRMATION = auto()
 
 
+COUNTDOWN_SECONDS = 3
+
+
 class App:
     def __init__(self) -> None:
         pygame.init()
@@ -153,7 +156,7 @@ class App:
 
     def _cancel_song_exit(self) -> None:
         if self.song_exit_return_screen is Screen.COUNTDOWN:
-            self.countdown_started_at = pygame.time.get_ticks() - (5 - self.countdown_remaining_on_modal) * 1000
+            self.countdown_started_at = pygame.time.get_ticks() - (COUNTDOWN_SECONDS - self.countdown_remaining_on_modal) * 1000
         elif self.song_exit_return_screen is Screen.PLAYING:
             pygame.mixer.music.unpause()
         self.current_screen = self.song_exit_return_screen
@@ -265,7 +268,7 @@ class App:
         return 0.0 if self.current_screen is Screen.COUNTDOWN else max(0, pygame.mixer.music.get_pos()) / 1000
 
     def _countdown_remaining(self) -> int:
-        return max(0, 5 - int((pygame.time.get_ticks() - self.countdown_started_at) / 1000))
+        return max(0, COUNTDOWN_SECONDS - int((pygame.time.get_ticks() - self.countdown_started_at) / 1000))
 
     def _load_receptors(self) -> dict[str, pygame.Surface]:
         arrow = pygame.image.load(FONT_PATH.parent.parent / "gameplay" / "arrow.png").convert_alpha()
