@@ -66,7 +66,7 @@ class App:
         self.running = True
         self.current_screen = Screen.SPLASH
         self.songs: list[Song] = discover_songs(SONG_DIRECTORY)
-        self.assets = Assets(self.songs)
+        self.assets = Assets(self.songs, self.screen)
         self.selected = 0
         self.first_visible_row = 0
         self.exit_confirmation_selected = False

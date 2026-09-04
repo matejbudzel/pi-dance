@@ -28,7 +28,7 @@ def render_splash(screen: pygame.Surface, assets: Assets) -> None:
 
 
 def render_performance_hud(screen: pygame.Surface, assets: Assets, frames_per_second: float, frame_ms: int) -> None:
-    text = assets.performance_font.render(f"{frames_per_second:4.1f} FPS  {frame_ms:02d} ms", True, (180, 255, 180))
+    text = assets.performance_font.render(f"{frames_per_second:4.1f} FPS  {frame_ms:02d} ms", False, (180, 255, 180))
     frame = text.get_rect(bottomright=(APP_WIDTH - 12, APP_HEIGHT - 10)).inflate(12, 8)
     pygame.draw.rect(screen, (0, 0, 0), frame)
     pygame.draw.rect(screen, (90, 150, 90), frame, width=1)
@@ -38,7 +38,7 @@ def render_performance_hud(screen: pygame.Surface, assets: Assets, frames_per_se
 def render_song_list(screen: pygame.Surface, assets: Assets, songs: list[Song], selected: int, first_visible_row: int, visible_rows: int) -> None:
     screen.blit(assets.rainbow_title, (40, 28))
     if not songs:
-        shrug = assets.shrug_font.render(r"\_(^_^)_/", True, FOREGROUND)
+        shrug = assets.shrug_font.render(r"\_(^_^)_/", False, FOREGROUND)
         screen.blit(shrug, shrug.get_rect(center=(APP_WIDTH // 2, 240)))
         _render_exit_item(screen, assets, selected, 0, APP_HEIGHT - 70)
         return
@@ -53,14 +53,14 @@ def render_song_list(screen: pygame.Surface, assets: Assets, songs: list[Song], 
             if menu_row == selected:
                 _blit_chevron(screen, assets, 64, y, color)
             title = _ellipsize(assets.list_font, song.title, COVER_X - LIST_TEXT_X - 28)
-            screen.blit(assets.list_font.render(title, True, color), (LIST_TEXT_X, y))
+            screen.blit(assets.list_font.render(title, False, color), (LIST_TEXT_X, y))
         elif menu_row == len(songs) + 1:
             _render_exit_item(screen, assets, selected, len(songs), y)
 
 
 def render_application_exit_confirmation(screen: pygame.Surface, assets: Assets, selected: bool) -> None:
     screen.blit(assets.rainbow_title, (40, 28))
-    message = assets.question_font.render(SETTINGS.exit_confirmation_text, True, FOREGROUND)
+    message = assets.question_font.render(SETTINGS.exit_confirmation_text, False, FOREGROUND)
     screen.blit(message, message.get_rect(center=(APP_WIDTH // 2, 200)))
     render_confirmation_buttons(screen, assets, SETTINGS.exit_confirm_button, SETTINGS.exit_cancel_button, selected, 286)
 
@@ -84,7 +84,7 @@ def render_gameplay(screen: pygame.Surface, assets: Assets, song: Song | None, s
 
 
 def render_countdown(screen: pygame.Surface, assets: Assets, remaining: int) -> None:
-    number = assets.question_font.render(str(remaining), True, FOREGROUND)
+    number = assets.question_font.render(str(remaining), False, FOREGROUND)
     screen.blit(number, number.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2)))
 
 
@@ -111,7 +111,7 @@ def render_modal(screen: pygame.Surface, assets: Assets, message: str) -> None:
     frame = pygame.Rect(220, 162, 414, 156)
     pygame.draw.rect(screen, (20, 20, 26), frame)
     pygame.draw.rect(screen, (230, 230, 230), frame, width=3)
-    text = assets.question_font.render(message, True, FOREGROUND)
+    text = assets.question_font.render(message, False, FOREGROUND)
     screen.blit(text, text.get_rect(center=frame.center))
 
 
@@ -121,7 +121,7 @@ def render_song_exit_confirmation(screen: pygame.Surface, assets: Assets, select
 
 
 def render_confirmation_buttons(screen: pygame.Surface, assets: Assets, confirm: str, cancel: str, confirm_selected: bool, y: int) -> None:
-    rendered = [(assets.list_font.render(label, True, (255, 150, 100) if selected else FOREGROUND), selected) for label, selected in ((confirm, confirm_selected), (cancel, not confirm_selected))]
+    rendered = [(assets.list_font.render(label, False, (255, 150, 100) if selected else FOREGROUND), selected) for label, selected in ((confirm, confirm_selected), (cancel, not confirm_selected))]
     gap = 72
     x = (APP_WIDTH - sum(text.get_width() for text, _ in rendered) - gap) // 2
     for text, selected in rendered:
@@ -141,7 +141,7 @@ def _render_gameplay_header(screen: pygame.Surface, assets: Assets, song: Song, 
         fill = progress.copy()
         fill.width = max(1, round(progress.width * ratio))
         pygame.draw.rect(screen, FOREGROUND, fill)
-    screen.blit(assets.list_font.render(song.title, True, FOREGROUND), (40, 42))
+    screen.blit(assets.list_font.render(song.title, False, FOREGROUND), (40, 42))
 
 
 def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Session | None, song_seconds: float) -> None:
@@ -178,11 +178,11 @@ def _render_exit_item(screen: pygame.Surface, assets: Assets, selected: int, exi
     color = (255, 150, 100) if selected == exit_index else FOREGROUND
     if selected == exit_index:
         _blit_chevron(screen, assets, 64, y, color)
-    screen.blit(assets.list_font.render(SETTINGS.exit_item_title, True, color), (LIST_TEXT_X, y))
+    screen.blit(assets.list_font.render(SETTINGS.exit_item_title, False, color), (LIST_TEXT_X, y))
 
 
 def _blit_chevron(screen: pygame.Surface, assets: Assets, x: int, y: int, color: tuple[int, int, int]) -> None:
-    screen.blit(assets.list_font.render(">", True, color), (x, y))
+    screen.blit(assets.list_font.render(">", False, color), (x, y))
 
 
 def _ellipsize(font: pygame.font.Font, text: str, maximum_width: int) -> str:

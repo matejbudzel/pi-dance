@@ -12,7 +12,7 @@ from .songs import Song
 
 
 class Assets:
-    def __init__(self, songs: list[Song]) -> None:
+    def __init__(self, songs: list[Song], canvas: pygame.Surface) -> None:
         self.title_font = pygame.font.Font(FONT_PATH, 38)
         self.title_font.set_bold(True)
         self.list_font = pygame.font.Font(FONT_PATH, 28)
@@ -27,7 +27,7 @@ class Assets:
         self.feedback_icons = self._load_feedback_icons()
         self.draft_star, self.earned_star = self._load_result_stars()
         self.covers = {
-            song.path: pygame.transform.scale(pygame.image.load(song.cover_path).convert(), (256, 256))
+            song.path: pygame.transform.scale(pygame.image.load(song.cover_path).convert(canvas), (256, 256))
             for song in songs
         }
 
@@ -60,7 +60,7 @@ class Assets:
         return draft, earned
 
     def _make_rainbow_title(self) -> pygame.Surface:
-        mask = self.title_font.render(TITLE, True, FOREGROUND)
+        mask = self.title_font.render(TITLE, False, FOREGROUND)
         rainbow = pygame.Surface(mask.get_size(), pygame.SRCALPHA)
         for stripe, x in enumerate(range(-mask.get_height(), mask.get_width() + mask.get_height(), 12)):
             color = colorsys.hsv_to_rgb((stripe % 12) / 12, 0.85, 1.0)
