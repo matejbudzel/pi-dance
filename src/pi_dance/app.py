@@ -34,7 +34,10 @@ class App:
         self.screen = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT))
         self.clock = pygame.time.Clock()
         self.title_font = pygame.font.Font(FONT_PATH, 38)
+        self.title_font.set_bold(True)
         self.list_font = pygame.font.Font(FONT_PATH, 28)
+        self.question_font = pygame.font.Font(FONT_PATH, 28)
+        self.question_font.set_bold(True)
         self.shrug_font = pygame.font.Font(FONT_PATH, 24)
         self.running = True
         self.current_screen = Screen.SPLASH
@@ -104,6 +107,8 @@ class App:
         if not self.songs:
             shrug = self.shrug_font.render(r"\_(^_^)_/", True, FOREGROUND)
             self.screen.blit(shrug, shrug.get_rect(center=(APP_WIDTH // 2, 240)))
+            self._render_exit_item(APP_HEIGHT - 70)
+            return
 
         for menu_row in range(self.first_visible_row, self.first_visible_row + self._visible_rows()):
             y = 118 + (menu_row - self.first_visible_row) * 44
@@ -116,27 +121,40 @@ class App:
                 title = self.list_font.render(song.title, True, color)
                 self.screen.blit(title, (104, y))
             elif menu_row == len(self.songs) + 1:
-                color = (255, 150, 100) if self.selected == len(self.songs) else FOREGROUND
-                if self.selected == len(self.songs):
-                    chevron = self.list_font.render(">", True, color)
-                    self.screen.blit(chevron, (64, y))
-                title = self.list_font.render(SETTINGS.exit_item_title, True, color)
-                self.screen.blit(title, (104, y))
+                self._render_exit_item(y)
+
+    def _render_exit_item(self, y: int) -> None:
+        color = (255, 150, 100) if self.selected == len(self.songs) else FOREGROUND
+        if self.selected == len(self.songs):
+            chevron = self.list_font.render(">", True, color)
+            self.screen.blit(chevron, (64, y))
+        title = self.list_font.render(SETTINGS.exit_item_title, True, color)
+        self.screen.blit(title, (104, y))
 
     def _render_exit_confirmation(self) -> None:
-        message = self.list_font.render(SETTINGS.exit_confirmation_text, True, FOREGROUND)
+        self.screen.blit(self.rainbow_title, (40, 28))
+        message = self.question_font.render(SETTINGS.exit_confirmation_text, True, FOREGROUND)
         self.screen.blit(message, message.get_rect(center=(APP_WIDTH // 2, 200)))
 
-        self._render_confirmation_button(SETTINGS.exit_confirm_button, 290, self.exit_confirmation_selected)
-        self._render_confirmation_button(SETTINGS.exit_cancel_button, 390, not self.exit_confirmation_selected)
+        self._render_confirmation_buttons()
 
-    def _render_confirmation_button(self, label: str, center_x: int, selected: bool) -> None:
-        color = (255, 150, 100) if selected else FOREGROUND
-        text = self.list_font.render(label, True, color)
-        self.screen.blit(text, text.get_rect(center=(center_x, 300)))
-        if selected:
-            chevron = self.list_font.render(">", True, color)
-            self.screen.blit(chevron, (text.get_rect(center=(center_x, 300)).left - 34, 286))
+    def _render_confirmation_buttons(self) -> None:
+        buttons = (
+            (SETTINGS.exit_confirm_button, self.exit_confirmation_selected),
+            (SETTINGS.exit_cancel_button, not self.exit_confirmation_selected),
+        )
+        rendered = [
+            (self.list_font.render(label, True, (255, 150, 100) if selected else FOREGROUND), selected)
+            for label, selected in buttons
+        ]
+        gap = 72
+        x = (APP_WIDTH - sum(text.get_width() for text, _ in rendered) - gap) // 2
+        for text, selected in rendered:
+            self.screen.blit(text, (x, 286))
+            if selected:
+                chevron = self.list_font.render(">", True, (255, 150, 100))
+                self.screen.blit(chevron, (x - 34, 286))
+            x += text.get_width() + gap
 
     def _handle_exit_confirmation_action(self, action: Action) -> None:
         if action in (Action.LEFT, Action.RIGHT, Action.UP, Action.DOWN):
