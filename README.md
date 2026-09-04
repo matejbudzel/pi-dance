@@ -191,14 +191,25 @@ Global audio/input timing offsets should be configurable so HDMI/display/input l
 - settings UI
 - text-heavy instructions or judgement labels
 
-## Development
+## Installation and first run
 
-Requires Python 3.11+ for desktop development.
+Python 3.11+ is required. On Debian, Raspberry Pi OS, or DietPi, install the
+small set of system tools first. `ffmpeg` converts the song audio and
+ImageMagick provides the `magick` cover-image converter.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+sudo apt update
+sudo apt install python3-venv python3-pip ffmpeg imagemagick
+```
+
+Clone the repository, create its virtual environment, and install the game:
+
+```bash
+git clone https://github.com/matejbudzel/pi-dance.git
+cd pi-dance
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e .
 ```
 
 Create the device-local configuration once; it is deliberately ignored by Git:
@@ -208,7 +219,8 @@ cp pi-dance.ini.example pi-dance.ini
 ```
 
 Edit `pi-dance.ini` to localize or brand the title and point the game at the
-external prepared song directory:
+external song directory. For example, use the absolute path where you copied
+the downloaded song folders:
 
 ```ini
 [game]
@@ -231,13 +243,21 @@ exit_cancel_button = No
 timing_offset_ms = 0
 ```
 
+Prepare the downloaded song bundles. The dry run first shows what will be
+created; the second command writes the WAV files, 256×256 covers, and metadata.
+
+```bash
+.venv/bin/python scripts/prepare_songs.py /path/to/pi-dance-songs --dry-run
+.venv/bin/python scripts/prepare_songs.py /path/to/pi-dance-songs
+```
+
 Start the game from the project directory so it reads that local configuration:
 
 ```bash
 .venv/bin/pi-dance
 ```
 
-The initial scaffold currently provides the portable application shell. Song discovery, chart parsing, audio playback and scoring will be added incrementally.
+Press F8 at any time to show or hide the developer performance overlay.
 
 ## Font
 
