@@ -262,6 +262,20 @@ Start the game from the project directory so it reads that local configuration:
 
 Press F8 at any time to show or hide the developer performance overlay.
 
+### Raspberry Pi display smoke test
+
+Before the first Pi launch, verify that the installed SDL2/Pygame display driver
+can draw to the connected screen without loading the game or songs:
+
+```bash
+.venv/bin/python scripts/pygame_display_smoke.py
+```
+
+It displays a four-colour grid and prints the selected SDL video driver. Press
+any keyboard or joystick button to exit. If no pattern appears, stop with
+Ctrl+C and keep the printed driver name: it identifies the display-backend
+problem independently of the game.
+
 ## Font
 
 The included `Sweet16mono` is a pixel-perfect 8×16 bitmap-style font by Martin
