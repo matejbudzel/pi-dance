@@ -4,6 +4,11 @@ title = Tancuj, tancuj, vykrúcaj!
 [songs]
 directory = songs
 
+[display]
+# Use fbdev on the Pi 1's legacy /dev/fb0 setup; leave pygame on desktop.
+backend = pygame
+framebuffer = /dev/fb0
+
 [exit]
 item_title = Koniec
 confirmation_text = Naozaj skončiť?

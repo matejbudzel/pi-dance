@@ -10,6 +10,7 @@ from .assets import Assets
 from .charts import Chart, load_sm
 from .config import APP_HEIGHT, APP_WIDTH, BACKGROUND, SETTINGS, SONG_DIRECTORY, TARGET_FPS, WINDOW_TITLE
 from .gameplay import JudgedNote, Judgement, Session
+from .fbdev import FbdevPresenter
 from .input import Action, actions_from_event
 from .songs import Song, discover_songs
 from . import views
@@ -50,6 +51,7 @@ class App:
         pygame.init()
         pygame.display.set_caption(WINDOW_TITLE)
         self.screen = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT))
+        self.framebuffer = self._open_framebuffer_presenter()
         self.clock = pygame.time.Clock()
         self.running = True
         self.current_screen = Screen.SPLASH
@@ -79,9 +81,21 @@ class App:
             self._update()
             self._render()
             pygame.display.flip()
+            if self.framebuffer is not None:
+                self.framebuffer.present(self.screen)
             self.clock.tick(TARGET_FPS)
         pygame.mixer.music.stop()
+        if self.framebuffer is not None:
+            self.framebuffer.close()
         pygame.quit()
+
+    @staticmethod
+    def _open_framebuffer_presenter() -> FbdevPresenter | None:
+        if SETTINGS.display_backend == "pygame":
+            return None
+        if SETTINGS.display_backend == "fbdev":
+            return FbdevPresenter(SETTINGS.framebuffer_device, (APP_WIDTH, APP_HEIGHT))
+        raise ValueError(f"unknown display backend: {SETTINGS.display_backend}")
 
     def _handle_events(self) -> None:
         for event in pygame.event.get():

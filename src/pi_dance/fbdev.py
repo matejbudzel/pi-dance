@@ -1,0 +1,109 @@
+"""Small legacy Linux framebuffer presenter for the Raspberry Pi 1."""
+
+from __future__ import annotations
+
+import ctypes
+import fcntl
+import mmap
+import os
+from pathlib import Path
+
+import pygame
+
+
+FBIOGET_FSCREENINFO = 0x4602
+FBIOGET_VSCREENINFO = 0x4600
+
+
+class FramebufferError(RuntimeError):
+    """The configured Linux framebuffer cannot present this canvas."""
+
+
+class _Bitfield(ctypes.Structure):
+    _fields_ = [("offset", ctypes.c_uint32), ("length", ctypes.c_uint32), ("msb_right", ctypes.c_uint32)]
+
+
+class _VariableScreenInfo(ctypes.Structure):
+    _fields_ = [
+        ("xres", ctypes.c_uint32), ("yres", ctypes.c_uint32),
+        ("xres_virtual", ctypes.c_uint32), ("yres_virtual", ctypes.c_uint32),
+        ("xoffset", ctypes.c_uint32), ("yoffset", ctypes.c_uint32),
+        ("bits_per_pixel", ctypes.c_uint32), ("grayscale", ctypes.c_uint32),
+        ("red", _Bitfield), ("green", _Bitfield), ("blue", _Bitfield), ("transp", _Bitfield),
+        ("nonstd", ctypes.c_uint32), ("activate", ctypes.c_uint32),
+        ("height", ctypes.c_uint32), ("width", ctypes.c_uint32), ("accel_flags", ctypes.c_uint32),
+        ("pixclock", ctypes.c_uint32), ("left_margin", ctypes.c_uint32), ("right_margin", ctypes.c_uint32),
+        ("upper_margin", ctypes.c_uint32), ("lower_margin", ctypes.c_uint32),
+        ("hsync_len", ctypes.c_uint32), ("vsync_len", ctypes.c_uint32),
+        ("sync", ctypes.c_uint32), ("vmode", ctypes.c_uint32), ("rotate", ctypes.c_uint32),
+        ("colorspace", ctypes.c_uint32), ("reserved", ctypes.c_uint32 * 4),
+    ]
+
+
+class _FixedScreenInfo(ctypes.Structure):
+    _fields_ = [
+        ("identifier", ctypes.c_char * 16), ("smem_start", ctypes.c_ulong), ("smem_len", ctypes.c_uint32),
+        ("type", ctypes.c_uint32), ("type_aux", ctypes.c_uint32), ("visual", ctypes.c_uint32),
+        ("xpanstep", ctypes.c_uint16), ("ypanstep", ctypes.c_uint16), ("ywrapstep", ctypes.c_uint16),
+        ("line_length", ctypes.c_uint32), ("mmio_start", ctypes.c_ulong), ("mmio_len", ctypes.c_uint32),
+        ("accel", ctypes.c_uint32), ("capabilities", ctypes.c_uint16), ("reserved", ctypes.c_uint16 * 2),
+    ]
+
+
+def _bitmask(field: _Bitfield) -> int:
+    return 0 if field.length == 0 else ((1 << field.length) - 1) << field.offset
+
+
+def _read_screen_info(descriptor: int) -> tuple[_FixedScreenInfo, _VariableScreenInfo]:
+    fixed_data = bytearray(ctypes.sizeof(_FixedScreenInfo))
+    variable_data = bytearray(ctypes.sizeof(_VariableScreenInfo))
+    fcntl.ioctl(descriptor, FBIOGET_FSCREENINFO, fixed_data, True)
+    fcntl.ioctl(descriptor, FBIOGET_VSCREENINFO, variable_data, True)
+    return _FixedScreenInfo.from_buffer_copy(fixed_data), _VariableScreenInfo.from_buffer_copy(variable_data)
+
+
+class FbdevPresenter:
+    """Copy a Pygame canvas to a 16-bit Linux framebuffer with native blits."""
+
+    def __init__(self, path: Path, canvas_size: tuple[int, int]) -> None:
+        self._descriptor = os.open(path, os.O_RDWR)
+        try:
+            fixed, variable = _read_screen_info(self._descriptor)
+            if variable.bits_per_pixel != 16:
+                raise FramebufferError(f"{path} is {variable.bits_per_pixel} bpp; RGB565 framebuffer required")
+            if canvas_size[0] > variable.xres or canvas_size[1] > variable.yres:
+                raise FramebufferError(f"canvas {canvas_size[0]}x{canvas_size[1]} does not fit {variable.xres}x{variable.yres} framebuffer")
+            self._line_length = fixed.line_length
+            self._bytes_per_pixel = variable.bits_per_pixel // 8
+            self._map = mmap.mmap(self._descriptor, fixed.smem_len, access=mmap.ACCESS_WRITE)
+            self._framebuffer_offset = variable.yoffset * fixed.line_length + variable.xoffset * self._bytes_per_pixel
+            masks = (_bitmask(variable.red), _bitmask(variable.green), _bitmask(variable.blue), _bitmask(variable.transp))
+            self._surface = pygame.Surface((variable.xres, variable.yres), depth=16, masks=masks)
+            self._canvas_rect = pygame.Rect((variable.xres - canvas_size[0]) // 2, (variable.yres - canvas_size[1]) // 2, *canvas_size)
+            self._surface.fill((0, 0, 0))
+            self._copy_rows(pygame.Rect(0, 0, variable.xres, variable.yres))
+        except BaseException:
+            os.close(self._descriptor)
+            raise
+
+    def present(self, canvas: pygame.Surface) -> None:
+        if canvas.get_size() != self._canvas_rect.size:
+            raise FramebufferError(f"canvas changed to {canvas.get_size()}, expected {self._canvas_rect.size}")
+        self._surface.blit(canvas, self._canvas_rect)
+        self._copy_rows(self._canvas_rect)
+
+    def close(self) -> None:
+        if hasattr(self, "_map"):
+            self._map.close()
+        if hasattr(self, "_descriptor"):
+            os.close(self._descriptor)
+            del self._descriptor
+
+    def _copy_rows(self, rectangle: pygame.Rect) -> None:
+        pixels = bytes(self._surface.get_view("0"))
+        source_pitch = self._surface.get_pitch()
+        row_width = rectangle.width * self._bytes_per_pixel
+        for row in range(rectangle.height):
+            source_start = (rectangle.y + row) * source_pitch + rectangle.x * self._bytes_per_pixel
+            target_start = self._framebuffer_offset + (rectangle.y + row) * self._line_length + rectangle.x * self._bytes_per_pixel
+            self._map[target_start:target_start + row_width] = pixels[source_start:source_start + row_width]

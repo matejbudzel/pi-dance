@@ -276,6 +276,26 @@ any keyboard or joystick button to exit. If no pattern appears, stop with
 Ctrl+C and keep the printed driver name: it identifies the display-backend
 problem independently of the game.
 
+The Pi 1 legacy setup used by `pi-286-games` exposes `/dev/fb0` instead of an
+SDL2 display driver. Test its direct presenter with:
+
+```bash
+.venv/bin/python scripts/pygame_display_smoke.py --fbdev /dev/fb0
+```
+
+If the grid appears, add this to the device-local `pi-dance.ini` before
+launching the game:
+
+```ini
+[display]
+backend = fbdev
+framebuffer = /dev/fb0
+```
+
+The user running the game must be allowed to write `/dev/fb0`, normally by
+being in the `video` group. Log out and back in after `sudo usermod -aG video
+"$USER"`.
+
 ## Font
 
 The included `Sweet16mono` is a pixel-perfect 8×16 bitmap-style font by Martin

@@ -22,6 +22,8 @@ class Settings:
     song_exit_confirm_button: str
     song_exit_cancel_button: str
     timing_offset_ms: int
+    display_backend: str
+    framebuffer_device: Path
 
 
 def load_settings(config_path: Path = Path("pi-dance.ini")) -> Settings:
@@ -46,6 +48,8 @@ def load_settings(config_path: Path = Path("pi-dance.ini")) -> Settings:
         song_exit_confirm_button=parser.get("gameplay", "exit_confirm_button", fallback="Áno").strip() or "Áno",
         song_exit_cancel_button=parser.get("gameplay", "exit_cancel_button", fallback="Nie").strip() or "Nie",
         timing_offset_ms=parser.getint("gameplay", "timing_offset_ms", fallback=0),
+        display_backend=parser.get("display", "backend", fallback="pygame").strip().lower() or "pygame",
+        framebuffer_device=Path(parser.get("display", "framebuffer", fallback="/dev/fb0").strip() or "/dev/fb0"),
     )
 
 

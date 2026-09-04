@@ -11,8 +11,11 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from pathlib import Path
 
 import pygame
+
+from pi_dance.fbdev import FbdevPresenter, FramebufferError
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,6 +28,7 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="exit automatically after this many seconds (0 means wait for input)",
     )
+    parser.add_argument("--fbdev", type=Path, metavar="DEVICE", help="also present frames directly to this legacy framebuffer")
     return parser.parse_args()
 
 
@@ -34,8 +38,11 @@ def main() -> int:
         raise SystemExit("width/height must be positive and seconds cannot be negative")
 
     pygame.init()
+    presenter: FbdevPresenter | None = None
     try:
         screen = pygame.display.set_mode((args.width, args.height))
+        if args.fbdev is not None:
+            presenter = FbdevPresenter(args.fbdev, screen.get_size())
         print(f"SDL video driver: {pygame.display.get_driver()}")
         print(f"Display surface: {screen.get_width()}x{screen.get_height()}")
         print(f"SDL_VIDEODRIVER: {os.environ.get('SDL_VIDEODRIVER', '(default)')}")
@@ -43,6 +50,8 @@ def main() -> int:
 
         _draw_pattern(screen)
         pygame.display.flip()
+        if presenter is not None:
+            presenter.present(screen)
         clock = pygame.time.Clock()
         started_at = pygame.time.get_ticks()
         while True:
@@ -52,10 +61,12 @@ def main() -> int:
             if args.seconds and pygame.time.get_ticks() - started_at >= round(args.seconds * 1000):
                 return 0
             clock.tick(30)
-    except pygame.error as error:
+    except (pygame.error, FramebufferError, OSError) as error:
         print(f"Pygame display error: {error}", file=sys.stderr)
         return 1
     finally:
+        if presenter is not None:
+            presenter.close()
         pygame.quit()
 
 
