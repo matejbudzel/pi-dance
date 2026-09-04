@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import colorsys
-
 import pygame
 
 from .config import FONT_PATH, FOREGROUND, TITLE
@@ -60,14 +58,12 @@ class Assets:
         return draft, earned
 
     def _make_rainbow_title(self) -> pygame.Surface:
-        mask = self.title_font.render(TITLE, False, FOREGROUND)
-        rainbow = pygame.Surface(mask.get_size(), pygame.SRCALPHA)
-        for stripe, x in enumerate(range(-mask.get_height(), mask.get_width() + mask.get_height(), 12)):
-            color = colorsys.hsv_to_rgb((stripe % 12) / 12, 0.85, 1.0)
-            pygame.draw.polygon(
-                rainbow,
-                tuple(round(channel * 255) for channel in color),
-                ((x, 0), (x + 12, 0), (x + 12 + mask.get_height(), mask.get_height()), (x + mask.get_height(), mask.get_height())),
-            )
-        rainbow.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        colors = ((75, 255, 105), (255, 235, 60), (60, 230, 255), (85, 125, 255), (235, 85, 255), (255, 85, 125))
+        glyphs = [self.title_font.render(letter, False, colors[index % len(colors)]) for index, letter in enumerate(TITLE)]
+        width = sum(glyph.get_width() for glyph in glyphs)
+        rainbow = pygame.Surface((width, self.title_font.get_height()), pygame.SRCALPHA)
+        x = 0
+        for glyph in glyphs:
+            rainbow.blit(glyph, (x, 0))
+            x += glyph.get_width()
         return rainbow
