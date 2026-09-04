@@ -197,6 +197,13 @@ pip install -e .
 PI_DANCE_SONGS_DIR=~/pi-dance-songs pi-dance
 ```
 
+The displayed game title defaults to `Tancuj, tancuj, vykrúcaj!`. It can be
+localized or branded without editing code:
+
+```bash
+PI_DANCE_TITLE="Dance, dance, spin around!" pi-dance
+```
+
 The initial scaffold currently provides the portable application shell. Song discovery, chart parsing, audio playback and scoring will be added incrementally.
 
 ## Font
