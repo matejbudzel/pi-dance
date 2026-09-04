@@ -29,7 +29,14 @@ class SongDiscoveryTests(unittest.TestCase):
     def _write_song(root: Path, name: str, title: str, audio: bool = True) -> None:
         bundle = root / name
         bundle.mkdir()
-        (bundle / "song.json").write_text(json.dumps({"title": title, "audio": "song.wav", "chart": "chart.sm"}))
+        (bundle / "song.json").write_text(json.dumps({
+            "title": title,
+            "audio": "song.wav",
+            "chart": "chart.sm",
+            "duration_seconds": 120,
+            "chart_difficulty": "Beginner",
+            "chart_meter": 1,
+        }))
         (bundle / "chart.sm").touch()
         if audio:
             (bundle / "song.wav").touch()

@@ -217,6 +217,12 @@ item_title = Exit
 confirmation_text = Exit the game?
 confirm_button = Yes
 cancel_button = No
+
+[gameplay]
+pause_text = Paused
+exit_confirmation_text = Stop dancing?
+exit_confirm_button = Yes
+exit_cancel_button = No
 ```
 
 Start the game from the project directory so it reads that local configuration:

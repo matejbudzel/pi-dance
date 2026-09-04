@@ -14,6 +14,11 @@ class Song:
     title: str
     path: Path
     focus_color: tuple[int, int, int]
+    audio_path: Path
+    chart_path: Path
+    duration_seconds: float
+    chart_difficulty: str
+    chart_meter: int
 
 
 def focus_color_for_title(title: str) -> tuple[int, int, int]:
@@ -41,14 +46,30 @@ def discover_songs(song_directory: Path) -> list[Song]:
             title = metadata["title"]
             audio = metadata["audio"]
             chart = metadata["chart"]
+            duration_seconds = float(metadata["duration_seconds"])
+            chart_difficulty = metadata["chart_difficulty"]
+            chart_meter = int(metadata["chart_meter"])
         except (OSError, json.JSONDecodeError, KeyError, TypeError):
             continue
         if not isinstance(title, str) or not title.strip():
             continue
-        if not isinstance(audio, str) or not isinstance(chart, str):
+        if not isinstance(audio, str) or not isinstance(chart, str) or duration_seconds <= 0:
+            continue
+        if not isinstance(chart_difficulty, str):
             continue
         if not (bundle / audio).is_file() or not (bundle / chart).is_file():
             continue
         clean_title = title.strip()
-        songs.append(Song(title=clean_title, path=bundle, focus_color=focus_color_for_title(clean_title)))
+        songs.append(
+            Song(
+                title=clean_title,
+                path=bundle,
+                focus_color=focus_color_for_title(clean_title),
+                audio_path=bundle / audio,
+                chart_path=bundle / chart,
+                duration_seconds=duration_seconds,
+                chart_difficulty=chart_difficulty,
+                chart_meter=chart_meter,
+            )
+        )
     return sorted(songs, key=lambda song: song.title.casefold())

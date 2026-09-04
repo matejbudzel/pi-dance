@@ -17,6 +17,10 @@ class Settings:
     exit_confirmation_text: str
     exit_confirm_button: str
     exit_cancel_button: str
+    pause_text: str
+    song_exit_confirmation_text: str
+    song_exit_confirm_button: str
+    song_exit_cancel_button: str
 
 
 def load_settings(config_path: Path = Path("pi-dance.ini")) -> Settings:
@@ -36,6 +40,10 @@ def load_settings(config_path: Path = Path("pi-dance.ini")) -> Settings:
         exit_confirmation_text=parser.get("exit", "confirmation_text", fallback="Naozaj skončiť?").strip() or "Naozaj skončiť?",
         exit_confirm_button=parser.get("exit", "confirm_button", fallback="Áno").strip() or "Áno",
         exit_cancel_button=parser.get("exit", "cancel_button", fallback="Nie").strip() or "Nie",
+        pause_text=parser.get("gameplay", "pause_text", fallback="Pauza").strip() or "Pauza",
+        song_exit_confirmation_text=parser.get("gameplay", "exit_confirmation_text", fallback="Prestať tancovať?").strip() or "Prestať tancovať?",
+        song_exit_confirm_button=parser.get("gameplay", "exit_confirm_button", fallback="Áno").strip() or "Áno",
+        song_exit_cancel_button=parser.get("gameplay", "exit_cancel_button", fallback="Nie").strip() or "Nie",
     )
 
 

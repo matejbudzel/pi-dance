@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -32,3 +33,14 @@ class ExitConfirmationTests(unittest.TestCase):
         self.app._handle_action(Action.START)
 
         self.assertFalse(self.app.running)
+
+    def test_song_exit_cancel_resumes_playback(self) -> None:
+        self.app.current_screen = Screen.PLAYING
+
+        with patch("pi_dance.app.pygame.mixer.music.pause") as pause, patch("pi_dance.app.pygame.mixer.music.unpause") as unpause:
+            self.app._handle_action(Action.SELECT)
+            self.app._handle_action(Action.START)
+
+        pause.assert_called_once()
+        unpause.assert_called_once()
+        self.assertIs(self.app.current_screen, Screen.PLAYING)

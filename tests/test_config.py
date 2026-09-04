@@ -16,6 +16,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.title, "Dance!")
         self.assertEqual(settings.song_directory, config_path.parent / "music")
         self.assertEqual(settings.exit_item_title, "Exit")
+        self.assertEqual(settings.pause_text, "Pauza")
 
     def test_uses_defaults_when_config_is_missing(self) -> None:
         settings = load_settings(Path("missing-pi-dance.ini"))
@@ -23,3 +24,4 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.title, "Tancuj, tancuj, vykrúcaj!")
         self.assertEqual(settings.song_directory, Path("songs"))
         self.assertEqual(settings.exit_confirmation_text, "Naozaj skončiť?")
+        self.assertEqual(settings.song_exit_confirmation_text, "Prestať tancovať?")

@@ -9,3 +9,9 @@ item_title = Koniec
 confirmation_text = Naozaj skončiť?
 confirm_button = Áno
 cancel_button = Nie
+
+[gameplay]
+pause_text = Pauza
+exit_confirmation_text = Prestať tancovať?
+exit_confirm_button = Áno
+exit_cancel_button = Nie
