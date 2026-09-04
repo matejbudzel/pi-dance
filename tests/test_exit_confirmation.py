@@ -11,6 +11,7 @@ from pi_dance.app import App, Screen
 from pi_dance.gameplay import Judgement, Session
 from pi_dance.charts import Note
 from pi_dance.input import Action, actions_from_event
+from pi_dance.console_input import KEY_SEQUENCES
 
 
 class ExitConfirmationTests(unittest.TestCase):
@@ -78,3 +79,9 @@ class ExitConfirmationTests(unittest.TestCase):
         event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F8)
 
         self.assertEqual(actions_from_event(event), [Action.DEBUG_TOGGLE_PERFORMANCE])
+
+    def test_console_key_sequences_share_the_action_mapping(self) -> None:
+        self.assertIs(KEY_SEQUENCES[b"\x1b[A"], Action.UP)
+        self.assertIs(KEY_SEQUENCES[b" "], Action.START)
+        self.assertIs(KEY_SEQUENCES[b"\x1b"], Action.SELECT)
+        self.assertIs(KEY_SEQUENCES[b"\x1b[19~"], Action.DEBUG_TOGGLE_PERFORMANCE)

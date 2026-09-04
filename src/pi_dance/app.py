@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum, auto
+from contextlib import nullcontext
 
 import pygame
 
@@ -11,6 +12,7 @@ from .charts import Chart, load_sm
 from .config import APP_HEIGHT, APP_WIDTH, BACKGROUND, SETTINGS, SONG_DIRECTORY, TARGET_FPS, WINDOW_TITLE
 from .gameplay import JudgedNote, Judgement, Session
 from .fbdev import FbdevPresenter
+from .console_input import ConsoleInput
 from .input import Action, actions_from_event
 from .songs import Song, discover_songs
 from . import views
@@ -76,18 +78,23 @@ class App:
         self.show_performance_hud = False
 
     def run(self) -> None:
-        while self.running:
-            self._handle_events()
-            self._update()
-            self._render()
-            pygame.display.flip()
+        console_input = ConsoleInput() if self.framebuffer is not None else None
+        try:
+            with console_input or nullcontext():
+                self.console_input = console_input
+                while self.running:
+                    self._handle_events()
+                    self._update()
+                    self._render()
+                    pygame.display.flip()
+                    if self.framebuffer is not None:
+                        self.framebuffer.present(self.screen)
+                    self.clock.tick(TARGET_FPS)
+        finally:
+            pygame.mixer.music.stop()
             if self.framebuffer is not None:
-                self.framebuffer.present(self.screen)
-            self.clock.tick(TARGET_FPS)
-        pygame.mixer.music.stop()
-        if self.framebuffer is not None:
-            self.framebuffer.close()
-        pygame.quit()
+                self.framebuffer.close()
+            pygame.quit()
 
     @staticmethod
     def _open_framebuffer_presenter() -> FbdevPresenter | None:
@@ -103,6 +110,9 @@ class App:
                 self.running = False
                 continue
             for action in actions_from_event(event):
+                self._handle_action(action)
+        if getattr(self, "console_input", None) is not None:
+            for action in self.console_input.poll_actions():
                 self._handle_action(action)
 
     def _handle_action(self, action: Action) -> None:

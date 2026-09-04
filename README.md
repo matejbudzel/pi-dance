@@ -296,6 +296,11 @@ The user running the game must be allowed to write `/dev/fb0`, normally by
 being in the `video` group. Log out and back in after `sudo usermod -aG video
 "$USER"`.
 
+With this backend the game also claims the active Linux console while it runs:
+the terminal cursor disappears, keyboard input is read directly, and the known
+dance pad is read from `/dev/input/js*`. The user needs access to `input` as
+well as `video`; log out and back in after `sudo usermod -aG input "$USER"`.
+
 ## Font
 
 The included `Sweet16mono` is a pixel-perfect 8×16 bitmap-style font by Martin
