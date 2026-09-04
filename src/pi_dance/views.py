@@ -11,7 +11,7 @@ from .songs import Song
 
 
 LANE_DIRECTIONS = ("left", "down", "up", "right")
-LANE_START_X = APP_WIDTH // 2 - 142
+LANE_START_X = APP_WIDTH // 2 - 78
 LANE_SPACING = 84
 HEADER_HEIGHT = 92
 NOTE_TRAVEL_SECONDS = 2.0
@@ -20,6 +20,7 @@ COVER_SIZE = 256
 COVER_X = APP_WIDTH - 40 - COVER_SIZE
 COVER_Y = 118
 GAMEPLAY_COVER_POSITION = (16, 108)
+FEEDBACK_CENTER_X = (LANE_START_X + (len(LANE_DIRECTIONS) - 1) * LANE_SPACING + 16 + APP_WIDTH) // 2
 
 
 def render_splash(screen: pygame.Surface, assets: Assets) -> None:
@@ -71,7 +72,7 @@ def render_gameplay(screen: pygame.Surface, assets: Assets, song: Song | None, s
         screen.blit(receptor, receptor.get_rect(center=center))
     if feedback is not None and song_seconds <= feedback_until:
         icon = assets.feedback_icons[feedback]
-        screen.blit(icon, icon.get_rect(midtop=(720, 104)))
+        screen.blit(icon, icon.get_rect(midtop=(FEEDBACK_CENTER_X, 104)))
 
 
 def render_countdown(screen: pygame.Surface, assets: Assets, remaining: int) -> None:
