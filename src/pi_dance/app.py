@@ -12,6 +12,7 @@ from .config import (
     FONT_PATH,
     FOREGROUND,
     SONG_DIRECTORY,
+    SETTINGS,
     TARGET_FPS,
     TITLE,
     WINDOW_TITLE,
@@ -23,6 +24,7 @@ from .songs import Song, discover_songs
 class Screen(Enum):
     SPLASH = auto()
     SONG_LIST = auto()
+    EXIT_CONFIRMATION = auto()
 
 
 class App:
@@ -38,7 +40,8 @@ class App:
         self.current_screen = Screen.SPLASH
         self.songs: list[Song] = discover_songs(SONG_DIRECTORY)
         self.selected = 0
-        self.first_visible = 0
+        self.first_visible_row = 0
+        self.exit_confirmation_selected = False
         self.rainbow_title = self._make_rainbow_title()
 
     def run(self) -> None:
@@ -63,26 +66,34 @@ class App:
         if action is Action.SELECT:
             if self.current_screen is Screen.SPLASH:
                 self.running = False
+            elif self.current_screen is Screen.EXIT_CONFIRMATION:
+                self.current_screen = Screen.SONG_LIST
             return
         if self.current_screen is Screen.SPLASH:
             if action is Action.START:
                 self.current_screen = Screen.SONG_LIST
             return
-        if not self.songs:
+        if self.current_screen is Screen.EXIT_CONFIRMATION:
+            self._handle_exit_confirmation_action(action)
             return
-        elif action is Action.UP:
-            self.selected = (self.selected - 1) % len(self.songs)
+        if action is Action.UP:
+            self.selected = (self.selected - 1) % self._menu_item_count()
             self._scroll_selection_into_view()
         elif action is Action.DOWN:
-            self.selected = (self.selected + 1) % len(self.songs)
+            self.selected = (self.selected + 1) % self._menu_item_count()
             self._scroll_selection_into_view()
+        elif action is Action.START and self.selected == len(self.songs):
+            self.exit_confirmation_selected = False
+            self.current_screen = Screen.EXIT_CONFIRMATION
 
     def _render(self) -> None:
         self.screen.fill(BACKGROUND)
         if self.current_screen is Screen.SPLASH:
             self._render_splash()
-        else:
+        elif self.current_screen is Screen.SONG_LIST:
             self._render_song_list()
+        else:
+            self._render_exit_confirmation()
 
     def _render_splash(self) -> None:
         title_position = self.rainbow_title.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2))
@@ -92,28 +103,66 @@ class App:
         self.screen.blit(self.rainbow_title, (40, 28))
         if not self.songs:
             shrug = self.shrug_font.render(r"\_(^_^)_/", True, FOREGROUND)
-            self.screen.blit(shrug, shrug.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2)))
-            return
+            self.screen.blit(shrug, shrug.get_rect(center=(APP_WIDTH // 2, 240)))
 
-        for row, song in enumerate(self.songs[self.first_visible : self.first_visible + self._visible_rows()]):
-            y = 118 + row * 44
-            index = self.first_visible + row
-            color = song.focus_color if index == self.selected else FOREGROUND
-            if index == self.selected:
-                chevron = self.list_font.render(">", True, color)
-                self.screen.blit(chevron, (64, y))
-            title = self.list_font.render(song.title, True, color)
-            self.screen.blit(title, (104, y))
+        for menu_row in range(self.first_visible_row, self.first_visible_row + self._visible_rows()):
+            y = 118 + (menu_row - self.first_visible_row) * 44
+            if menu_row < len(self.songs):
+                song = self.songs[menu_row]
+                color = song.focus_color if menu_row == self.selected else FOREGROUND
+                if menu_row == self.selected:
+                    chevron = self.list_font.render(">", True, color)
+                    self.screen.blit(chevron, (64, y))
+                title = self.list_font.render(song.title, True, color)
+                self.screen.blit(title, (104, y))
+            elif menu_row == len(self.songs) + 1:
+                color = (255, 150, 100) if self.selected == len(self.songs) else FOREGROUND
+                if self.selected == len(self.songs):
+                    chevron = self.list_font.render(">", True, color)
+                    self.screen.blit(chevron, (64, y))
+                title = self.list_font.render(SETTINGS.exit_item_title, True, color)
+                self.screen.blit(title, (104, y))
+
+    def _render_exit_confirmation(self) -> None:
+        message = self.list_font.render(SETTINGS.exit_confirmation_text, True, FOREGROUND)
+        self.screen.blit(message, message.get_rect(center=(APP_WIDTH // 2, 200)))
+
+        self._render_confirmation_button(SETTINGS.exit_confirm_button, 290, self.exit_confirmation_selected)
+        self._render_confirmation_button(SETTINGS.exit_cancel_button, 390, not self.exit_confirmation_selected)
+
+    def _render_confirmation_button(self, label: str, center_x: int, selected: bool) -> None:
+        color = (255, 150, 100) if selected else FOREGROUND
+        text = self.list_font.render(label, True, color)
+        self.screen.blit(text, text.get_rect(center=(center_x, 300)))
+        if selected:
+            chevron = self.list_font.render(">", True, color)
+            self.screen.blit(chevron, (text.get_rect(center=(center_x, 300)).left - 34, 286))
+
+    def _handle_exit_confirmation_action(self, action: Action) -> None:
+        if action in (Action.LEFT, Action.RIGHT, Action.UP, Action.DOWN):
+            self.exit_confirmation_selected = not self.exit_confirmation_selected
+        elif action is Action.START:
+            if self.exit_confirmation_selected:
+                self.running = False
+            else:
+                self.current_screen = Screen.SONG_LIST
 
     def _visible_rows(self) -> int:
         return (APP_HEIGHT - 118 - 30) // 44
 
+    def _menu_item_count(self) -> int:
+        return len(self.songs) + 1
+
+    def _selected_menu_row(self) -> int:
+        return self.selected if self.selected < len(self.songs) else len(self.songs) + 1
+
     def _scroll_selection_into_view(self) -> None:
         visible_rows = self._visible_rows()
-        if self.selected < self.first_visible:
-            self.first_visible = self.selected
-        elif self.selected >= self.first_visible + visible_rows:
-            self.first_visible = self.selected - visible_rows + 1
+        selected_row = self._selected_menu_row()
+        if selected_row < self.first_visible_row:
+            self.first_visible_row = selected_row
+        elif selected_row >= self.first_visible_row + visible_rows:
+            self.first_visible_row = selected_row - visible_rows + 1
 
     def _make_rainbow_title(self) -> pygame.Surface:
         mask = self.title_font.render(TITLE, True, FOREGROUND)

@@ -206,8 +206,17 @@ Edit `pi-dance.ini` to localize or brand the title and point the game at the
 external prepared song directory:
 
 ```ini
+[game]
+title = Dance, dance, spin around!
+
 [songs]
 directory = /home/matej/pi-dance-songs
+
+[exit]
+item_title = Exit
+confirmation_text = Exit the game?
+confirm_button = Yes
+cancel_button = No
 ```
 
 Start the game from the project directory so it reads that local configuration:
@@ -220,6 +229,7 @@ The initial scaffold currently provides the portable application shell. Song dis
 
 ## Font
 
-The included `HORIZON1994` bitmap font is a CC0/public-domain,
-VGA BIOS-compatible font by villesundell. Its license notice is retained in
-`src/pi_dance/assets/fonts/HORIZON1994-COPYING.txt`.
+The included `Sweet16mono` is a pixel-perfect 8×16 bitmap-style font by Martin
+Sedlák. It includes Latin Extended-A characters used by Slovak and Czech, and
+is licensed under the Boost Software License 1.0; its license notice is retained
+in `src/pi_dance/assets/fonts/SWEET16-LICENSE.txt`.

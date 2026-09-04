@@ -3,3 +3,9 @@ title = Tancuj, tancuj, vykrúcaj!
 
 [songs]
 directory = songs
+
+[exit]
+item_title = Koniec
+confirmation_text = Naozaj skončiť?
+confirm_button = Áno
+cancel_button = Nie
