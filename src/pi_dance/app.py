@@ -323,7 +323,7 @@ class App:
         if self.feedback is None or self._song_position_seconds() > self.feedback_until:
             return
         icon = self.feedback_icons[self.feedback]
-        self.screen.blit(icon, icon.get_rect(center=(APP_WIDTH // 2, 270)))
+        self.screen.blit(icon, icon.get_rect(midtop=(720, 104)))
 
     def _render_result(self) -> None:
         self._render_gameplay_header()
@@ -387,9 +387,9 @@ class App:
     def _load_feedback_icons(self) -> dict[Judgement, pygame.Surface]:
         asset_directory = FONT_PATH.parent.parent / "gameplay"
         return {
-            Judgement.GREAT: pygame.transform.scale(pygame.image.load(asset_directory / "heart.png").convert_alpha(), (48, 48)),
-            Judgement.OK: pygame.transform.scale(pygame.image.load(asset_directory / "thumb.png").convert_alpha(), (48, 48)),
-            Judgement.MISS: pygame.transform.scale(pygame.image.load(asset_directory / "shrug.png").convert_alpha(), (48, 48)),
+            Judgement.GREAT: pygame.image.load(asset_directory / "heart.png").convert_alpha(),
+            Judgement.OK: pygame.image.load(asset_directory / "thumb.png").convert_alpha(),
+            Judgement.MISS: pygame.image.load(asset_directory / "shrug.png").convert_alpha(),
         }
 
     def _visible_rows(self) -> int:
