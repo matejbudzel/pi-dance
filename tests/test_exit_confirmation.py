@@ -8,6 +8,8 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 from pi_dance.app import App, Screen
+from pi_dance.gameplay import Judgement, Session
+from pi_dance.charts import Note
 from pi_dance.input import Action
 
 
@@ -44,3 +46,13 @@ class ExitConfirmationTests(unittest.TestCase):
         pause.assert_called_once()
         unpause.assert_called_once()
         self.assertIs(self.app.current_screen, Screen.PLAYING)
+
+    def test_unmatched_direction_shows_shrug_without_a_score_judgement(self) -> None:
+        self.app.current_screen = Screen.PLAYING
+        self.app.session = Session((Note(10.0, "up"),))
+
+        self.app._handle_action(Action.LEFT)
+
+        self.assertIs(self.app.feedback, Judgement.MISS)
+        self.assertEqual(self.app.session.judgements, [])
+        self.assertGreater(self.app.receptor_glow_until["left"], pygame.time.get_ticks())
