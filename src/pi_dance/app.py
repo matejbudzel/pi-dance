@@ -27,6 +27,7 @@ COUNTDOWN_SECONDS = 3
 NOTE_TRAVEL_SECONDS = 2.0
 FEEDBACK_DURATION_SECONDS = 0.45
 RECEPTOR_GLOW_DURATION_MS = 110
+STAR_DELAY_MS = 500
 
 ACTION_DIRECTIONS = {
     Action.LEFT: "left",
@@ -64,12 +65,15 @@ class App:
         self.feedback_until = 0.0
         self.receptor_glow_until = {direction: 0 for direction in ACTION_DIRECTIONS.values()}
         self.playback_started = False
+        self.result_started_at = 0
+        self.result_stars = 0
         self.countdown_started_at = 0
         self.rainbow_title = self._make_rainbow_title()
         self.receptors = self._load_receptors()
         self.flow_arrows = self._load_flow_arrows()
         self.receptor_glows = {direction: pygame.transform.scale(arrow, (42, 42)) for direction, arrow in self.flow_arrows.items()}
         self.feedback_icons = self._load_feedback_icons()
+        self.draft_star, self.earned_star = self._load_result_stars()
 
     def run(self) -> None:
         while self.running:
@@ -199,6 +203,8 @@ class App:
             if self.playback_started and not pygame.mixer.music.get_busy():
                 self.session.expire(float("inf"))
                 pygame.mixer.music.stop()
+                self.result_stars = self.session.stars()
+                self.result_started_at = pygame.time.get_ticks()
                 self.current_screen = Screen.RESULT
 
     def _cancel_song_exit(self) -> None:
@@ -215,6 +221,7 @@ class App:
         self.session = None
         self.feedback = None
         self.playback_started = False
+        self.result_stars = 0
 
     def _render(self) -> None:
         self.screen.fill(BACKGROUND)
@@ -343,10 +350,18 @@ class App:
 
     def _render_result(self) -> None:
         self._render_gameplay_header()
-        if self.session is None:
-            return
-        stars = self.question_font.render("*" * self.session.stars(), True, self.active_song.focus_color if self.active_song else FOREGROUND)
-        self.screen.blit(stars, stars.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2)))
+        star_y = 222
+        star_spacing = 40
+        star_start_x = 253
+        for index in range(5):
+            self.screen.blit(self.draft_star, (star_start_x + index * star_spacing, star_y))
+        earned_count = min(self.result_stars, (pygame.time.get_ticks() - self.result_started_at) // STAR_DELAY_MS)
+        for index in range(earned_count):
+            self.screen.blit(self.earned_star, (star_start_x + index * star_spacing, star_y))
+        if earned_count >= self.result_stars and self.result_stars:
+            reaction = Judgement.MISS if self.result_stars <= 2 else Judgement.OK if self.result_stars <= 4 else Judgement.GREAT
+            icon = self.feedback_icons[reaction]
+            self.screen.blit(icon, icon.get_rect(midleft=(star_start_x + 5 * star_spacing + 24, star_y + 16)))
 
     def _render_modal(self, message: str) -> None:
         dimmer = pygame.Surface((APP_WIDTH, APP_HEIGHT), pygame.SRCALPHA)
@@ -407,6 +422,14 @@ class App:
             Judgement.OK: pygame.image.load(asset_directory / "thumb.png").convert_alpha(),
             Judgement.MISS: pygame.image.load(asset_directory / "shrug.png").convert_alpha(),
         }
+
+    def _load_result_stars(self) -> tuple[pygame.Surface, pygame.Surface]:
+        star = pygame.image.load(FONT_PATH.parent.parent / "gameplay" / "star.png").convert_alpha()
+        draft = star.copy()
+        draft.fill((110, 110, 110), special_flags=pygame.BLEND_RGBA_MULT)
+        earned = star.copy()
+        earned.fill((255, 220, 45), special_flags=pygame.BLEND_RGBA_MULT)
+        return draft, earned
 
     def _visible_rows(self) -> int:
         return (APP_HEIGHT - 118 - 30) // 44
