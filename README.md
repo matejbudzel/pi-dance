@@ -194,7 +194,13 @@ Requires Python 3.11+ for desktop development.
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
-pi-dance
+PI_DANCE_SONGS_DIR=~/pi-dance-songs pi-dance
 ```
 
 The initial scaffold currently provides the portable application shell. Song discovery, chart parsing, audio playback and scoring will be added incrementally.
+
+## Font
+
+The included `HORIZON1994` bitmap font is a CC0/public-domain,
+VGA BIOS-compatible font by villesundell. Its license notice is retained in
+`src/pi_dance/assets/fonts/HORIZON1994-COPYING.txt`.

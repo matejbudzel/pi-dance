@@ -1,9 +1,28 @@
 from __future__ import annotations
 
+from enum import Enum, auto
+import colorsys
+
 import pygame
 
-from .config import ACCENT, APP_HEIGHT, APP_WIDTH, BACKGROUND, FOREGROUND, TARGET_FPS, WINDOW_TITLE
+from .config import (
+    APP_HEIGHT,
+    APP_WIDTH,
+    BACKGROUND,
+    FONT_PATH,
+    FOREGROUND,
+    SONG_DIRECTORY,
+    TARGET_FPS,
+    TITLE,
+    WINDOW_TITLE,
+)
 from .input import Action, actions_from_event
+from .songs import Song, discover_songs
+
+
+class Screen(Enum):
+    SPLASH = auto()
+    SONG_LIST = auto()
 
 
 class App:
@@ -12,11 +31,15 @@ class App:
         pygame.display.set_caption(WINDOW_TITLE)
         self.screen = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT))
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.Font(None, 48)
-        self.small_font = pygame.font.Font(None, 28)
+        self.title_font = pygame.font.Font(FONT_PATH, 38)
+        self.list_font = pygame.font.Font(FONT_PATH, 28)
+        self.shrug_font = pygame.font.Font(FONT_PATH, 24)
         self.running = True
+        self.current_screen = Screen.SPLASH
+        self.songs: list[Song] = discover_songs(SONG_DIRECTORY)
         self.selected = 0
-        self.demo_songs = ["NO SONGS FOUND", "ADD SONG BUNDLES", "TO CONFIGURED PATH"]
+        self.first_visible = 0
+        self.rainbow_title = self._make_rainbow_title()
 
     def run(self) -> None:
         while self.running:
@@ -38,25 +61,69 @@ class App:
 
     def _handle_action(self, action: Action) -> None:
         if action is Action.SELECT:
-            self.running = False
+            if self.current_screen is Screen.SPLASH:
+                self.running = False
+            return
+        if self.current_screen is Screen.SPLASH:
+            if action is Action.START:
+                self.current_screen = Screen.SONG_LIST
+            return
+        if not self.songs:
+            return
         elif action is Action.UP:
-            self.selected = (self.selected - 1) % len(self.demo_songs)
+            self.selected = (self.selected - 1) % len(self.songs)
+            self._scroll_selection_into_view()
         elif action is Action.DOWN:
-            self.selected = (self.selected + 1) % len(self.demo_songs)
+            self.selected = (self.selected + 1) % len(self.songs)
+            self._scroll_selection_into_view()
 
     def _render(self) -> None:
         self.screen.fill(BACKGROUND)
+        if self.current_screen is Screen.SPLASH:
+            self._render_splash()
+        else:
+            self._render_song_list()
 
-        title = self.font.render("PI-DANCE", True, ACCENT)
-        self.screen.blit(title, (40, 32))
+    def _render_splash(self) -> None:
+        title_position = self.rainbow_title.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2))
+        self.screen.blit(self.rainbow_title, title_position)
 
-        subtitle = self.small_font.render("UP/DOWN select   ENTER/SPACE start   ESC back", True, FOREGROUND)
-        self.screen.blit(subtitle, (40, 88))
+    def _render_song_list(self) -> None:
+        self.screen.blit(self.rainbow_title, (40, 28))
+        if not self.songs:
+            shrug = self.shrug_font.render(r"\_(^_^)_/", True, FOREGROUND)
+            self.screen.blit(shrug, shrug.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2)))
+            return
 
-        y = 170
-        for index, song in enumerate(self.demo_songs):
-            prefix = "> " if index == self.selected else "  "
-            color = ACCENT if index == self.selected else FOREGROUND
-            row = self.font.render(prefix + song, True, color)
-            self.screen.blit(row, (72, y))
-            y += 64
+        for row, song in enumerate(self.songs[self.first_visible : self.first_visible + self._visible_rows()]):
+            y = 118 + row * 44
+            index = self.first_visible + row
+            if index == self.selected:
+                chevron = self.list_font.render(">", True, FOREGROUND)
+                self.screen.blit(chevron, (64, y))
+            title = self.list_font.render(song.title, True, FOREGROUND)
+            self.screen.blit(title, (104, y))
+
+    def _visible_rows(self) -> int:
+        return (APP_HEIGHT - 118 - 30) // 44
+
+    def _scroll_selection_into_view(self) -> None:
+        visible_rows = self._visible_rows()
+        if self.selected < self.first_visible:
+            self.first_visible = self.selected
+        elif self.selected >= self.first_visible + visible_rows:
+            self.first_visible = self.selected - visible_rows + 1
+
+    def _make_rainbow_title(self) -> pygame.Surface:
+        mask = self.title_font.render(TITLE, True, FOREGROUND)
+        rainbow = pygame.Surface(mask.get_size(), pygame.SRCALPHA)
+        stripe_width = 12
+        for stripe, x in enumerate(range(-mask.get_height(), mask.get_width() + mask.get_height(), stripe_width)):
+            color = colorsys.hsv_to_rgb((stripe % 12) / 12, 0.85, 1.0)
+            pygame.draw.polygon(
+                rainbow,
+                tuple(round(channel * 255) for channel in color),
+                ((x, 0), (x + stripe_width, 0), (x + stripe_width + mask.get_height(), mask.get_height()), (x + mask.get_height(), mask.get_height())),
+            )
+        rainbow.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        return rainbow

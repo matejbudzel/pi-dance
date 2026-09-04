@@ -1,9 +1,4 @@
 .venv/
+*.egg-info/
 __pycache__/
 *.py[cod]
-.DS_Store
-.pytest_cache/
-.ruff_cache/
-
-# Local song content must never be committed.
-songs/
