@@ -202,7 +202,7 @@ ImageMagick provides the `magick` cover-image converter.
 
 ```bash
 sudo apt update
-sudo apt install python3-venv python3-pip ffmpeg imagemagick
+sudo apt install python3-venv python3-pip ffmpeg imagemagick libsdl2-image-2.0-0 libsdl2-mixer-2.0-0 libsdl2-ttf-2.0-0
 ```
 
 Clone the repository, create its virtual environment, and install the game:
