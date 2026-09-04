@@ -27,6 +27,14 @@ def render_splash(screen: pygame.Surface, assets: Assets) -> None:
     screen.blit(assets.rainbow_title, assets.rainbow_title.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2)))
 
 
+def render_performance_hud(screen: pygame.Surface, assets: Assets, frames_per_second: float, frame_ms: int) -> None:
+    text = assets.performance_font.render(f"{frames_per_second:4.1f} FPS  {frame_ms:02d} ms", True, (180, 255, 180))
+    frame = text.get_rect(bottomright=(APP_WIDTH - 12, APP_HEIGHT - 10)).inflate(12, 8)
+    pygame.draw.rect(screen, (0, 0, 0), frame)
+    pygame.draw.rect(screen, (90, 150, 90), frame, width=1)
+    screen.blit(text, text.get_rect(center=frame.center))
+
+
 def render_song_list(screen: pygame.Surface, assets: Assets, songs: list[Song], selected: int, first_visible_row: int, visible_rows: int) -> None:
     screen.blit(assets.rainbow_title, (40, 28))
     if not songs:

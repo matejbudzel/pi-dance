@@ -71,6 +71,7 @@ class App:
         self.result_started_at = 0
         self.result_stars = 0
         self.countdown_started_at = 0
+        self.show_performance_hud = False
 
     def run(self) -> None:
         while self.running:
@@ -91,7 +92,9 @@ class App:
                 self._handle_action(action)
 
     def _handle_action(self, action: Action) -> None:
-        if action in DEBUG_RESULT_STARS and self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING, Screen.PAUSED):
+        if action is Action.DEBUG_TOGGLE_PERFORMANCE:
+            self.show_performance_hud = not self.show_performance_hud
+        elif action in DEBUG_RESULT_STARS and self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING, Screen.PAUSED):
             self._show_debug_result(DEBUG_RESULT_STARS[action])
         elif action is Action.SELECT:
             self._handle_select()
@@ -243,6 +246,8 @@ class App:
                 views.render_modal(self.screen, self.assets, SETTINGS.pause_text)
             elif self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
                 views.render_song_exit_confirmation(self.screen, self.assets, self.song_exit_confirmation_selected)
+        if self.show_performance_hud:
+            views.render_performance_hud(self.screen, self.assets, self.clock.get_fps(), self.clock.get_time())
 
     def _song_position_seconds(self) -> float:
         return self._audio_position_seconds() + SETTINGS.timing_offset_ms / 1000

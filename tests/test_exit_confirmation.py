@@ -10,7 +10,7 @@ import pygame
 from pi_dance.app import App, Screen
 from pi_dance.gameplay import Judgement, Session
 from pi_dance.charts import Note
-from pi_dance.input import Action
+from pi_dance.input import Action, actions_from_event
 
 
 class ExitConfirmationTests(unittest.TestCase):
@@ -66,3 +66,15 @@ class ExitConfirmationTests(unittest.TestCase):
         stop.assert_called_once()
         self.assertIs(self.app.current_screen, Screen.RESULT)
         self.assertEqual(self.app.result_stars, 4)
+
+    def test_performance_hud_toggle_is_available_in_every_screen(self) -> None:
+        self.app._handle_action(Action.DEBUG_TOGGLE_PERFORMANCE)
+        self.assertTrue(self.app.show_performance_hud)
+
+        self.app._handle_action(Action.DEBUG_TOGGLE_PERFORMANCE)
+        self.assertFalse(self.app.show_performance_hud)
+
+    def test_f8_maps_to_the_performance_hud_toggle(self) -> None:
+        event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F8)
+
+        self.assertEqual(actions_from_event(event), [Action.DEBUG_TOGGLE_PERFORMANCE])

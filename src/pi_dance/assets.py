@@ -19,6 +19,7 @@ class Assets:
         self.question_font = pygame.font.Font(FONT_PATH, 28)
         self.question_font.set_bold(True)
         self.shrug_font = pygame.font.Font(FONT_PATH, 24)
+        self.performance_font = pygame.font.Font(FONT_PATH, 16)
         self.rainbow_title = self._make_rainbow_title()
         self.receptors = self._load_rotated("arrow.png")
         self.flow_arrows = self._load_rotated("arrow-flow.png")
