@@ -101,6 +101,9 @@ The [`matejbudzel/pi-286-games`](https://github.com/matejbudzel/pi-286-games) re
 
 Runtime audio is 22.05 kHz, 16-bit PCM stereo WAV. This is deliberately a
 low-bandwidth format for the Pi while avoiding MP3 decoding during gameplay.
+The mixer uses the same format with a 2048-sample buffer to reduce Pi 1 audio
+underruns; use the configurable timing offset if the extra buffer needs small
+input calibration.
 
 No copyrighted music or community chart files belong in this repository. The game loads song bundles from a configurable external directory.
 

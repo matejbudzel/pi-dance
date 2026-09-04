@@ -32,6 +32,8 @@ class Screen(Enum):
 COUNTDOWN_SECONDS = 3
 FEEDBACK_DURATION_SECONDS = 0.45
 RECEPTOR_GLOW_DURATION_MS = 110
+MIXER_FREQUENCY = 22050
+MIXER_BUFFER_SAMPLES = 2048
 
 ACTION_DIRECTIONS = {
     Action.LEFT: "left",
@@ -50,6 +52,7 @@ DEBUG_RESULT_STARS = {
 
 class App:
     def __init__(self) -> None:
+        pygame.mixer.pre_init(MIXER_FREQUENCY, -16, 2, MIXER_BUFFER_SAMPLES)
         pygame.init()
         pygame.display.set_caption(WINDOW_TITLE)
         self.screen = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT))
