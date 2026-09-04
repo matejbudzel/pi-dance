@@ -225,7 +225,8 @@ class App:
     def _render_gameplay_header(self) -> None:
         if self.active_song is None:
             return
-        pygame.draw.rect(self.screen, self.active_song.focus_color, pygame.Rect(0, 0, APP_WIDTH, 92))
+        header_color = tuple(channel * 55 // 100 for channel in self.active_song.focus_color)
+        pygame.draw.rect(self.screen, header_color, pygame.Rect(0, 0, APP_WIDTH, 92))
         self._render_progress_bar()
         title = self.list_font.render(self.active_song.title, True, FOREGROUND)
         self.screen.blit(title, (40, 42))
