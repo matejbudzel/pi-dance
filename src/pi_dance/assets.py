@@ -26,7 +26,7 @@ class Assets:
         self.feedback_icons = self._load_feedback_icons()
         self.draft_star, self.earned_star = self._load_result_stars()
         self.covers = {
-            song.path: pygame.transform.scale(pygame.image.load(song.cover_path).convert(), (128, 128))
+            song.path: pygame.transform.scale(pygame.image.load(song.cover_path).convert(), (256, 256))
             for song in songs
         }
 
