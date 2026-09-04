@@ -7,6 +7,7 @@ import pygame
 
 from .charts import Chart, load_sm
 from .config import APP_HEIGHT, APP_WIDTH, BACKGROUND, FONT_PATH, FOREGROUND, SETTINGS, SONG_DIRECTORY, TARGET_FPS, TITLE, WINDOW_TITLE
+from .gameplay import JudgedNote, Judgement, Session
 from .input import Action, actions_from_event
 from .songs import Song, discover_songs
 
@@ -19,9 +20,19 @@ class Screen(Enum):
     PLAYING = auto()
     PAUSED = auto()
     SONG_EXIT_CONFIRMATION = auto()
+    RESULT = auto()
 
 
 COUNTDOWN_SECONDS = 3
+NOTE_TRAVEL_SECONDS = 2.0
+FEEDBACK_DURATION_SECONDS = 0.45
+
+ACTION_DIRECTIONS = {
+    Action.LEFT: "left",
+    Action.DOWN: "down",
+    Action.UP: "up",
+    Action.RIGHT: "right",
+}
 
 
 class App:
@@ -47,9 +58,15 @@ class App:
         self.countdown_remaining_on_modal = 0
         self.active_song: Song | None = None
         self.active_chart: Chart | None = None
+        self.session: Session | None = None
+        self.feedback: Judgement | None = None
+        self.feedback_until = 0.0
+        self.playback_started = False
         self.countdown_started_at = 0
         self.rainbow_title = self._make_rainbow_title()
         self.receptors = self._load_receptors()
+        self.flow_arrows = self._load_flow_arrows()
+        self.feedback_icons = self._load_feedback_icons()
 
     def run(self) -> None:
         while self.running:
@@ -83,11 +100,17 @@ class App:
         elif self.current_screen is Screen.PLAYING and action is Action.START:
             pygame.mixer.music.pause()
             self.current_screen = Screen.PAUSED
+        elif self.current_screen is Screen.PLAYING and action in ACTION_DIRECTIONS:
+            if self.session is not None:
+                self._show_judgement(self.session.press(ACTION_DIRECTIONS[action], self._song_position_seconds()))
         elif self.current_screen is Screen.PAUSED and action is Action.START:
             pygame.mixer.music.unpause()
             self.current_screen = Screen.PLAYING
         elif self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
             self._handle_song_exit_action(action)
+        elif self.current_screen is Screen.RESULT and action is Action.START:
+            self._stop_song()
+            self.current_screen = Screen.SONG_LIST
 
     def _handle_select(self) -> None:
         if self.current_screen is Screen.SPLASH:
@@ -96,6 +119,9 @@ class App:
             self.current_screen = Screen.SONG_LIST
         elif self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
             self._cancel_song_exit()
+        elif self.current_screen is Screen.RESULT:
+            self._stop_song()
+            self.current_screen = Screen.SONG_LIST
         elif self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING, Screen.PAUSED):
             self.song_exit_return_screen = self.current_screen
             if self.current_screen is Screen.COUNTDOWN:
@@ -146,13 +172,25 @@ class App:
         except (OSError, pygame.error, StopIteration, ValueError):
             return
         self.active_song = song
+        self.session = Session(self.active_chart.notes)
+        self.feedback = None
+        self.playback_started = False
         self.countdown_started_at = pygame.time.get_ticks()
         self.current_screen = Screen.COUNTDOWN
 
     def _update(self) -> None:
         if self.current_screen is Screen.COUNTDOWN and self._countdown_remaining() <= 0:
             pygame.mixer.music.play()
+            self.playback_started = True
             self.current_screen = Screen.PLAYING
+        elif self.current_screen is Screen.PLAYING and self.session is not None:
+            song_time = self._song_position_seconds()
+            for result in self.session.expire(song_time):
+                self._show_judgement(result)
+            if self.playback_started and not pygame.mixer.music.get_busy():
+                self.session.expire(float("inf"))
+                pygame.mixer.music.stop()
+                self.current_screen = Screen.RESULT
 
     def _cancel_song_exit(self) -> None:
         if self.song_exit_return_screen is Screen.COUNTDOWN:
@@ -165,6 +203,9 @@ class App:
         pygame.mixer.music.stop()
         self.active_song = None
         self.active_chart = None
+        self.session = None
+        self.feedback = None
+        self.playback_started = False
 
     def _render(self) -> None:
         self.screen.fill(BACKGROUND)
@@ -174,6 +215,8 @@ class App:
             self._render_song_list()
         elif self.current_screen is Screen.EXIT_CONFIRMATION:
             self._render_application_exit_confirmation()
+        elif self.current_screen is Screen.RESULT:
+            self._render_result()
         else:
             self._render_gameplay()
             if self.current_screen is Screen.COUNTDOWN:
@@ -218,9 +261,11 @@ class App:
 
     def _render_gameplay(self) -> None:
         self._render_gameplay_header()
+        self._render_flowing_notes()
         for index, direction in enumerate(("left", "down", "up", "right")):
             receptor = self.receptors[direction]
             self.screen.blit(receptor, receptor.get_rect(center=(APP_WIDTH // 2 - 142 + index * 84, 132)))
+        self._render_feedback()
 
     def _render_gameplay_header(self) -> None:
         if self.active_song is None:
@@ -235,7 +280,7 @@ class App:
         rect = pygame.Rect(40, 16, APP_WIDTH - 80, 12)
         pygame.draw.rect(self.screen, FOREGROUND, rect, width=2)
         if self.active_song is not None:
-            ratio = min(1.0, self._song_position_seconds() / self.active_song.duration_seconds)
+            ratio = min(1.0, self._audio_position_seconds() / self.active_song.duration_seconds)
             if ratio > 0:
                 fill = rect.copy()
                 fill.width = max(1, round(rect.width * ratio))
@@ -244,6 +289,35 @@ class App:
     def _render_countdown(self) -> None:
         number = self.question_font.render(str(self._countdown_remaining()), True, FOREGROUND)
         self.screen.blit(number, number.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2)))
+
+    def _render_flowing_notes(self) -> None:
+        if self.session is None:
+            return
+        previous_clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(0, 92, APP_WIDTH, APP_HEIGHT - 92))
+        song_time = self._song_position_seconds()
+        for note in self.session.pending:
+            seconds_until_note = note.timestamp - song_time
+            if not -0.25 <= seconds_until_note <= NOTE_TRAVEL_SECONDS:
+                continue
+            lane = ("left", "down", "up", "right").index(note.direction)
+            y = 132 + seconds_until_note * (APP_HEIGHT + 16 - 132) / NOTE_TRAVEL_SECONDS
+            arrow = self.flow_arrows[note.direction]
+            self.screen.blit(arrow, arrow.get_rect(center=(APP_WIDTH // 2 - 142 + lane * 84, round(y))))
+        self.screen.set_clip(previous_clip)
+
+    def _render_feedback(self) -> None:
+        if self.feedback is None or self._song_position_seconds() > self.feedback_until:
+            return
+        icon = self.feedback_icons[self.feedback]
+        self.screen.blit(icon, icon.get_rect(center=(APP_WIDTH // 2, 270)))
+
+    def _render_result(self) -> None:
+        self._render_gameplay_header()
+        if self.session is None:
+            return
+        stars = self.question_font.render("*" * self.session.stars(), True, self.active_song.focus_color if self.active_song else FOREGROUND)
+        self.screen.blit(stars, stars.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2)))
 
     def _render_modal(self, message: str) -> None:
         dimmer = pygame.Surface((APP_WIDTH, APP_HEIGHT), pygame.SRCALPHA)
@@ -273,7 +347,15 @@ class App:
         self.screen.blit(self.list_font.render(">", True, color), (x, y))
 
     def _song_position_seconds(self) -> float:
+        return self._audio_position_seconds() + SETTINGS.timing_offset_ms / 1000
+
+    def _audio_position_seconds(self) -> float:
         return 0.0 if self.current_screen is Screen.COUNTDOWN else max(0, pygame.mixer.music.get_pos()) / 1000
+
+    def _show_judgement(self, result: JudgedNote | None) -> None:
+        if result is not None:
+            self.feedback = result.judgement
+            self.feedback_until = self._song_position_seconds() + FEEDBACK_DURATION_SECONDS
 
     def _countdown_remaining(self) -> int:
         return max(0, COUNTDOWN_SECONDS - int((pygame.time.get_ticks() - self.countdown_started_at) / 1000))
@@ -281,6 +363,18 @@ class App:
     def _load_receptors(self) -> dict[str, pygame.Surface]:
         arrow = pygame.image.load(FONT_PATH.parent.parent / "gameplay" / "arrow.png").convert_alpha()
         return {"up": arrow, "down": pygame.transform.rotate(arrow, 180), "left": pygame.transform.rotate(arrow, 90), "right": pygame.transform.rotate(arrow, -90)}
+
+    def _load_flow_arrows(self) -> dict[str, pygame.Surface]:
+        arrow = pygame.image.load(FONT_PATH.parent.parent / "gameplay" / "arrow-flow.png").convert_alpha()
+        return {"up": arrow, "down": pygame.transform.rotate(arrow, 180), "left": pygame.transform.rotate(arrow, 90), "right": pygame.transform.rotate(arrow, -90)}
+
+    def _load_feedback_icons(self) -> dict[Judgement, pygame.Surface]:
+        asset_directory = FONT_PATH.parent.parent / "gameplay"
+        return {
+            Judgement.GREAT: pygame.transform.scale(pygame.image.load(asset_directory / "heart.png").convert_alpha(), (48, 48)),
+            Judgement.OK: pygame.transform.scale(pygame.image.load(asset_directory / "thumb.png").convert_alpha(), (48, 48)),
+            Judgement.MISS: pygame.transform.scale(pygame.image.load(asset_directory / "shrug.png").convert_alpha(), (48, 48)),
+        }
 
     def _visible_rows(self) -> int:
         return (APP_HEIGHT - 118 - 30) // 44

@@ -223,6 +223,7 @@ pause_text = Paused
 exit_confirmation_text = Stop dancing?
 exit_confirm_button = Yes
 exit_cancel_button = No
+timing_offset_ms = 0
 ```
 
 Start the game from the project directory so it reads that local configuration:

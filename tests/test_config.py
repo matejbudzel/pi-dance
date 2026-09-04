@@ -25,3 +25,4 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.song_directory, Path("songs"))
         self.assertEqual(settings.exit_confirmation_text, "Naozaj skončiť?")
         self.assertEqual(settings.song_exit_confirmation_text, "Prestať tancovať?")
+        self.assertEqual(settings.timing_offset_ms, 0)
