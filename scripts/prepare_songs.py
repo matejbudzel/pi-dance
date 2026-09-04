@@ -2,8 +2,8 @@
 """Create Pi-Dance runtime files from downloaded StepMania song bundles.
 
 The input directory is deliberately external to the repository: it may contain
-copyrighted audio and community charts.  This tool preserves downloaded source
-files and creates only ``song.wav`` and ``song.json`` alongside them.
+copyrighted audio and community charts. This tool preserves downloaded source
+files and creates ``song.wav``, ``song.bmp``, and ``song.json`` alongside them.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from pathlib import Path
 
 
 AUDIO_EXTENSIONS = (".ogg", ".mp3")
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
 DIFFICULTY_ORDER = {
     "beginner": 0,
     "easy": 1,
@@ -79,6 +81,31 @@ def input_audio(song_dir: Path) -> Path:
     return audio[0]
 
 
+def input_cover(song_dir: Path) -> Path | None:
+    """Return the most likely downloaded jacket image, if one exists."""
+    candidates = [
+        path
+        for path in song_dir.iterdir()
+        if path.suffix.lower() in IMAGE_EXTENSIONS and path.name.lower() != "song.bmp"
+    ]
+    if not candidates:
+        return None
+
+    def priority(path: Path) -> tuple[int, str]:
+        name = path.stem.casefold()
+        if "jacket" in name or "cover" in name:
+            return (0, name)
+        if name == song_dir.name.casefold():
+            return (1, name)
+        return (2, name)
+
+    return min(candidates, key=priority)
+
+
+def fallback_cover_path() -> Path:
+    return Path(__file__).parents[1] / "src" / "pi_dance" / "assets" / "gameplay" / "fallback-cover.bmp"
+
+
 def audio_duration_seconds(audio_path: Path) -> float:
     result = subprocess.run(
         [
@@ -98,6 +125,42 @@ def audio_duration_seconds(audio_path: Path) -> float:
     return round(float(result.stdout.strip()), 3)
 
 
+def existing_metadata(metadata_path: Path) -> dict[str, object]:
+    if not metadata_path.exists():
+        return {}
+    value = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("song.json must contain an object")
+    return value
+
+
+def merged_metadata(generated: dict[str, object], existing: dict[str, object], overwrite: bool) -> dict[str, object]:
+    """Keep user-edited metadata while backfilling new generated fields."""
+    if overwrite:
+        return generated
+    return {**generated, **existing}
+
+
+def create_cover(source: Path, output: Path) -> None:
+    subprocess.run(
+        [
+            "magick",
+            str(source),
+            "-auto-orient",
+            "-filter",
+            "point",
+            "-resize",
+            "128x128^",
+            "-gravity",
+            "center",
+            "-extent",
+            "128x128",
+            f"BMP3:{output}",
+        ],
+        check=True,
+    )
+
+
 def prepare_song(song_dir: Path, overwrite: bool, dry_run: bool) -> None:
     sm_files = sorted(song_dir.glob("*.sm"))
     if len(sm_files) != 1:
@@ -108,10 +171,9 @@ def prepare_song(song_dir: Path, overwrite: bool, dry_run: bool) -> None:
     choice = easiest_dance_single(sm_contents)
     source_audio = input_audio(song_dir)
     wav_path = song_dir / "song.wav"
+    cover_path = song_dir / "song.bmp"
     metadata_path = song_dir / "song.json"
-
-    if not overwrite and (wav_path.exists() or metadata_path.exists()):
-        raise FileExistsError("song.wav or song.json already exists (pass --overwrite to replace it)")
+    source_cover = input_cover(song_dir)
 
     title = sm_tag(sm_contents, "TITLE") or song_dir.name
     artist = sm_tag(sm_contents, "ARTIST") or ""
@@ -124,24 +186,42 @@ def prepare_song(song_dir: Path, overwrite: bool, dry_run: bool) -> None:
         "chart_style": "dance-single",
         "chart_difficulty": choice.difficulty,
         "chart_meter": choice.meter,
+        "cover": cover_path.name,
         "source_url": source_url(song_dir),
     }
+    existing = existing_metadata(metadata_path)
+    metadata = merged_metadata(metadata, existing, overwrite)
+    needs_wav = overwrite or not wav_path.exists()
+    needs_cover = overwrite or not cover_path.exists()
+    needs_metadata = overwrite or not metadata_path.exists() or metadata != existing
 
-    print(f"{song_dir.name}: {source_audio.name} -> {wav_path.name}; {choice.difficulty} {choice.meter}")
+    actions = [
+        f"WAV {'create' if needs_wav else 'keep'}",
+        f"cover {'create' if needs_cover else 'keep'}",
+        f"metadata {'write' if needs_metadata else 'keep'}",
+    ]
+    print(f"{song_dir.name}: {choice.difficulty} {choice.meter}; {', '.join(actions)}")
     if dry_run:
         return
 
-    subprocess.run(
-        ["ffmpeg", "-v", "error", "-y", "-i", str(source_audio), "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", str(wav_path)],
-        check=True,
-    )
-    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    if needs_wav:
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", str(source_audio), "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", str(wav_path)],
+            check=True,
+        )
+    if needs_cover:
+        if source_cover is not None:
+            create_cover(source_cover, cover_path)
+        else:
+            shutil.copyfile(fallback_cover_path(), cover_path)
+    if needs_metadata:
+        metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("song_directory", type=Path, help="directory containing one directory per downloaded song")
-    parser.add_argument("--overwrite", action="store_true", help="replace existing generated song.wav and song.json files")
+    parser.add_argument("--overwrite", action="store_true", help="replace existing generated WAV, cover, and metadata files")
     parser.add_argument("--dry-run", action="store_true", help="validate and list changes without writing files")
     args = parser.parse_args()
 

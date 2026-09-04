@@ -1,6 +1,7 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 import unittest
 
 
@@ -27,3 +28,22 @@ class PrepareSongsTests(unittest.TestCase):
 
     def test_reads_a_basic_sm_tag(self) -> None:
         self.assertEqual(prepare_songs.sm_tag("#TITLE:Example Song;", "TITLE"), "Example Song")
+
+    def test_prefers_existing_metadata_when_backfilling(self) -> None:
+        generated = {"title": "Generated", "cover": "song.bmp", "chart_meter": 1}
+        existing = {"title": "Hand-picked title", "chart_meter": 4}
+
+        self.assertEqual(
+            prepare_songs.merged_metadata(generated, existing, overwrite=False),
+            {"title": "Hand-picked title", "cover": "song.bmp", "chart_meter": 4},
+        )
+
+    def test_prefers_jacket_over_other_images(self) -> None:
+        with TemporaryDirectory() as directory:
+            bundle = Path(directory) / "Example"
+            bundle.mkdir()
+            (bundle / "Example.png").touch()
+            (bundle / "Example-jacket.png").touch()
+            (bundle / "song.bmp").touch()
+
+            self.assertEqual(prepare_songs.input_cover(bundle).name, "Example-jacket.png")

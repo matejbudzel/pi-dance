@@ -17,6 +17,7 @@ class SongDiscoveryTests(unittest.TestCase):
             songs = discover_songs(root)
 
         self.assertEqual([song.title for song in songs], ["Apple", "Zebra"])
+        self.assertTrue(songs[0].cover_path.name == "fallback-cover.bmp")
 
     def test_focus_color_is_stable_and_bright(self) -> None:
         color = focus_color_for_title("How Far I'll Go")

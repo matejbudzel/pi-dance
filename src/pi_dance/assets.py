@@ -8,10 +8,11 @@ import pygame
 
 from .config import FONT_PATH, FOREGROUND, TITLE
 from .gameplay import Judgement
+from .songs import Song
 
 
 class Assets:
-    def __init__(self) -> None:
+    def __init__(self, songs: list[Song]) -> None:
         self.title_font = pygame.font.Font(FONT_PATH, 38)
         self.title_font.set_bold(True)
         self.list_font = pygame.font.Font(FONT_PATH, 28)
@@ -24,6 +25,10 @@ class Assets:
         self.receptor_glows = {direction: pygame.transform.scale(arrow, (42, 42)) for direction, arrow in self.flow_arrows.items()}
         self.feedback_icons = self._load_feedback_icons()
         self.draft_star, self.earned_star = self._load_result_stars()
+        self.covers = {song.path: pygame.image.load(song.cover_path).convert() for song in songs}
+
+    def cover_for(self, song: Song) -> pygame.Surface:
+        return self.covers[song.path]
 
     def _load_rotated(self, filename: str) -> dict[str, pygame.Surface]:
         arrow = pygame.image.load(FONT_PATH.parent.parent / "gameplay" / filename).convert_alpha()

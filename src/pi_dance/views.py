@@ -15,6 +15,10 @@ LANE_START_X = APP_WIDTH // 2 - 142
 LANE_SPACING = 84
 HEADER_HEIGHT = 92
 NOTE_TRAVEL_SECONDS = 2.0
+LIST_TEXT_X = 104
+COVER_SIZE = 128
+COVER_X = APP_WIDTH - 40 - COVER_SIZE
+COVER_Y = 118
 
 
 def render_splash(screen: pygame.Surface, assets: Assets) -> None:
@@ -28,6 +32,9 @@ def render_song_list(screen: pygame.Surface, assets: Assets, songs: list[Song], 
         screen.blit(shrug, shrug.get_rect(center=(APP_WIDTH // 2, 240)))
         _render_exit_item(screen, assets, selected, 0, APP_HEIGHT - 70)
         return
+    if selected < len(songs):
+        cover = assets.cover_for(songs[selected])
+        screen.blit(cover, (COVER_X, COVER_Y))
     for menu_row in range(first_visible_row, first_visible_row + visible_rows):
         y = 118 + (menu_row - first_visible_row) * 44
         if menu_row < len(songs):
@@ -35,7 +42,8 @@ def render_song_list(screen: pygame.Surface, assets: Assets, songs: list[Song], 
             color = song.focus_color if menu_row == selected else FOREGROUND
             if menu_row == selected:
                 _blit_chevron(screen, assets, 64, y, color)
-            screen.blit(assets.list_font.render(song.title, True, color), (104, y))
+            title = _ellipsize(assets.list_font, song.title, COVER_X - LIST_TEXT_X - 28)
+            screen.blit(assets.list_font.render(title, True, color), (LIST_TEXT_X, y))
         elif menu_row == len(songs) + 1:
             _render_exit_item(screen, assets, selected, len(songs), y)
 
@@ -159,8 +167,18 @@ def _render_exit_item(screen: pygame.Surface, assets: Assets, selected: int, exi
     color = (255, 150, 100) if selected == exit_index else FOREGROUND
     if selected == exit_index:
         _blit_chevron(screen, assets, 64, y, color)
-    screen.blit(assets.list_font.render(SETTINGS.exit_item_title, True, color), (104, y))
+    screen.blit(assets.list_font.render(SETTINGS.exit_item_title, True, color), (LIST_TEXT_X, y))
 
 
 def _blit_chevron(screen: pygame.Surface, assets: Assets, x: int, y: int, color: tuple[int, int, int]) -> None:
     screen.blit(assets.list_font.render(">", True, color), (x, y))
+
+
+def _ellipsize(font: pygame.font.Font, text: str, maximum_width: int) -> str:
+    if font.size(text)[0] <= maximum_width:
+        return text
+    suffix = "..."
+    shortened = text
+    while shortened and font.size(shortened + suffix)[0] > maximum_width:
+        shortened = shortened[:-1]
+    return shortened.rstrip() + suffix

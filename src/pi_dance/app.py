@@ -51,10 +51,10 @@ class App:
         pygame.display.set_caption(WINDOW_TITLE)
         self.screen = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT))
         self.clock = pygame.time.Clock()
-        self.assets = Assets()
         self.running = True
         self.current_screen = Screen.SPLASH
         self.songs: list[Song] = discover_songs(SONG_DIRECTORY)
+        self.assets = Assets(self.songs)
         self.selected = 0
         self.first_visible_row = 0
         self.exit_confirmation_selected = False

@@ -16,6 +16,7 @@ class Song:
     focus_color: tuple[int, int, int]
     audio_path: Path
     chart_path: Path
+    cover_path: Path
     duration_seconds: float
     chart_difficulty: str
     chart_meter: int
@@ -25,6 +26,10 @@ def focus_color_for_title(title: str) -> tuple[int, int, int]:
     """Create a stable, high-contrast colour from a song's displayed title."""
     hue = int.from_bytes(hashlib.blake2s(title.encode("utf-8"), digest_size=2).digest(), "big") / 65536
     return tuple(round(channel * 255) for channel in colorsys.hsv_to_rgb(hue, 0.72, 1.0))
+
+
+def fallback_cover_path() -> Path:
+    return Path(__file__).parent / "assets" / "gameplay" / "fallback-cover.bmp"
 
 
 def discover_songs(song_directory: Path) -> list[Song]:
@@ -46,6 +51,7 @@ def discover_songs(song_directory: Path) -> list[Song]:
             title = metadata["title"]
             audio = metadata["audio"]
             chart = metadata["chart"]
+            cover = metadata.get("cover", "song.bmp")
             duration_seconds = float(metadata["duration_seconds"])
             chart_difficulty = metadata["chart_difficulty"]
             chart_meter = int(metadata["chart_meter"])
@@ -53,13 +59,16 @@ def discover_songs(song_directory: Path) -> list[Song]:
             continue
         if not isinstance(title, str) or not title.strip():
             continue
-        if not isinstance(audio, str) or not isinstance(chart, str) or duration_seconds <= 0:
+        if not isinstance(audio, str) or not isinstance(chart, str) or not isinstance(cover, str) or duration_seconds <= 0:
             continue
         if not isinstance(chart_difficulty, str):
             continue
         if not (bundle / audio).is_file() or not (bundle / chart).is_file():
             continue
         clean_title = title.strip()
+        resolved_cover = bundle / cover
+        if not resolved_cover.is_file():
+            resolved_cover = fallback_cover_path()
         songs.append(
             Song(
                 title=clean_title,
@@ -67,6 +76,7 @@ def discover_songs(song_directory: Path) -> list[Song]:
                 focus_color=focus_color_for_title(clean_title),
                 audio_path=bundle / audio,
                 chart_path=bundle / chart,
+                cover_path=resolved_cover,
                 duration_seconds=duration_seconds,
                 chart_difficulty=chart_difficulty,
                 chart_meter=chart_meter,

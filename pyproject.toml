@@ -19,4 +19,4 @@ pi-dance = "pi_dance.main:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-pi_dance = ["assets/fonts/*.ttf", "assets/fonts/*.txt", "assets/gameplay/*.png"]
+pi_dance = ["assets/fonts/*.ttf", "assets/fonts/*.txt", "assets/gameplay/*.png", "assets/gameplay/*.bmp"]
