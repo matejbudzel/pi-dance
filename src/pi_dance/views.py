@@ -19,6 +19,7 @@ LIST_TEXT_X = 104
 COVER_SIZE = 256
 COVER_X = APP_WIDTH - 40 - COVER_SIZE
 COVER_Y = 118
+GAMEPLAY_COVER_POSITION = (16, 108)
 
 
 def render_splash(screen: pygame.Surface, assets: Assets) -> None:
@@ -59,6 +60,7 @@ def render_gameplay(screen: pygame.Surface, assets: Assets, song: Song | None, s
     if song is None:
         return
     _render_gameplay_header(screen, assets, song, audio_seconds)
+    screen.blit(assets.cover_for(song), GAMEPLAY_COVER_POSITION)
     _render_flowing_notes(screen, assets, session, song_seconds)
     for index, direction in enumerate(LANE_DIRECTIONS):
         center = (LANE_START_X + index * LANE_SPACING, 132)
