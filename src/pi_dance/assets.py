@@ -25,7 +25,10 @@ class Assets:
         self.receptor_glows = {direction: pygame.transform.scale(arrow, (42, 42)) for direction, arrow in self.flow_arrows.items()}
         self.feedback_icons = self._load_feedback_icons()
         self.draft_star, self.earned_star = self._load_result_stars()
-        self.covers = {song.path: pygame.image.load(song.cover_path).convert() for song in songs}
+        self.covers = {
+            song.path: pygame.transform.scale(pygame.image.load(song.cover_path).convert(), (128, 128))
+            for song in songs
+        }
 
     def cover_for(self, song: Song) -> pygame.Surface:
         return self.covers[song.path]

@@ -128,7 +128,7 @@ Example metadata:
 
 `song.json` is the authoritative application metadata. It includes the displayed
 title, artist, duration, generated WAV filename, source `.sm` filename, selected
-chart difficulty/meter, 128×128 cover filename, and the download URL retained
+chart difficulty/meter, 256×256 cover filename, and the download URL retained
 from the original `.txt` file. The cover is picked from a downloaded jacket
 image when possible; otherwise a bundled generic cover is used.
 
