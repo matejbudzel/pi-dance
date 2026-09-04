@@ -264,6 +264,10 @@ Start the game from the project directory so it reads that local configuration:
 ```
 
 Press F8 at any time to show or hide the developer performance overlay.
+It displays the most recent frame's input (`i`), update (`u`), render (`r`),
+and presentation (`p`) time in milliseconds. When the application exits, its
+average, maximum, and final frame timing are written to
+`/tmp/last-pi-dance-run.txt`.
 
 ### Raspberry Pi display smoke test
 

@@ -7,6 +7,7 @@ import pygame
 from .assets import Assets
 from .config import APP_HEIGHT, APP_WIDTH, FOREGROUND, SETTINGS
 from .gameplay import Judgement, Session
+from .performance import FrameTiming
 from .songs import Song
 
 
@@ -27,12 +28,15 @@ def render_splash(screen: pygame.Surface, assets: Assets) -> None:
     screen.blit(assets.rainbow_title, assets.rainbow_title.get_rect(center=(APP_WIDTH // 2, APP_HEIGHT // 2)))
 
 
-def render_performance_hud(screen: pygame.Surface, assets: Assets, frames_per_second: float, frame_ms: int) -> None:
-    text = assets.performance_font.render(f"{frames_per_second:4.1f} FPS  {frame_ms:02d} ms", False, (180, 255, 180))
-    frame = text.get_rect(bottomright=(APP_WIDTH - 12, APP_HEIGHT - 10)).inflate(12, 8)
+def render_performance_hud(screen: pygame.Surface, assets: Assets, timing: FrameTiming) -> None:
+    summary = assets.performance_font.render(f"{timing.frames_per_second:4.1f} FPS  {timing.frame_ms:05.1f} ms", False, (180, 255, 180))
+    detail = assets.performance_font.render(f"i{timing.input_ms:4.1f} u{timing.update_ms:4.1f} r{timing.render_ms:4.1f} p{timing.present_ms:4.1f}", False, (180, 255, 180))
+    frame = pygame.Rect(0, 0, max(summary.get_width(), detail.get_width()) + 12, summary.get_height() + detail.get_height() + 12)
+    frame.bottomright = (APP_WIDTH - 12, APP_HEIGHT - 10)
     pygame.draw.rect(screen, (0, 0, 0), frame)
     pygame.draw.rect(screen, (90, 150, 90), frame, width=1)
-    screen.blit(text, text.get_rect(center=frame.center))
+    screen.blit(summary, (frame.x + 6, frame.y + 4))
+    screen.blit(detail, (frame.x + 6, frame.y + 4 + summary.get_height()))
 
 
 def render_song_list(screen: pygame.Surface, assets: Assets, songs: list[Song], selected: int, first_visible_row: int, visible_rows: int) -> None:

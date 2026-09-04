@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from enum import Enum, auto
 from contextlib import nullcontext
+from enum import Enum, auto
+from pathlib import Path
 
 import pygame
 
@@ -14,6 +15,7 @@ from .gameplay import JudgedNote, Judgement, Session
 from .fbdev import FbdevPresenter
 from .console_input import ConsoleInput
 from .input import Action, actions_from_event
+from .performance import FrameTiming, PerformanceTracker
 from .songs import Song, discover_songs
 from . import views
 
@@ -84,6 +86,7 @@ class App:
         self.result_stars = 0
         self.countdown_started_at = 0
         self.show_performance_hud = False
+        self.performance = PerformanceTracker()
 
     def run(self) -> None:
         console_input = ConsoleInput() if self.framebuffer is not None else None
@@ -91,15 +94,32 @@ class App:
             with console_input or nullcontext():
                 self.console_input = console_input
                 while self.running:
+                    frame_started = pygame.time.get_ticks()
                     self._handle_events()
+                    input_finished = pygame.time.get_ticks()
                     self._update()
+                    update_finished = pygame.time.get_ticks()
                     self._render()
+                    render_finished = pygame.time.get_ticks()
                     if self.framebuffer is not None:
                         self.framebuffer.present(self.screen)
                     else:
                         pygame.display.flip()
+                    present_finished = pygame.time.get_ticks()
                     self.clock.tick(TARGET_FPS)
+                    frame_finished = pygame.time.get_ticks()
+                    self.performance.record(
+                        FrameTiming(
+                            input_ms=input_finished - frame_started,
+                            update_ms=update_finished - input_finished,
+                            render_ms=render_finished - update_finished,
+                            present_ms=present_finished - render_finished,
+                            work_ms=present_finished - frame_started,
+                            frame_ms=frame_finished - frame_started,
+                        )
+                    )
         finally:
+            self.performance.write_report(Path("/tmp/last-pi-dance-run.txt"))
             pygame.mixer.music.stop()
             if self.framebuffer is not None:
                 self.framebuffer.close()
@@ -280,7 +300,7 @@ class App:
             elif self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
                 views.render_song_exit_confirmation(self.screen, self.assets, self.song_exit_confirmation_selected)
         if self.show_performance_hud:
-            views.render_performance_hud(self.screen, self.assets, self.clock.get_fps(), self.clock.get_time())
+            views.render_performance_hud(self.screen, self.assets, self.performance.latest)
 
     def _song_position_seconds(self) -> float:
         return self._audio_position_seconds() + SETTINGS.timing_offset_ms / 1000
