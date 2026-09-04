@@ -194,19 +194,26 @@ Requires Python 3.11+ for desktop development.
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
-pi-dance
 ```
 
-Game setup lives in [`pi-dance.ini`](pi-dance.ini). Its title defaults to
-`Tancuj, tancuj, vykrúcaj!`; localize or brand it, and point the game at the
-external prepared song directory, without editing code:
+Create the device-local configuration once; it is deliberately ignored by Git:
+
+```bash
+cp pi-dance.ini.example pi-dance.ini
+```
+
+Edit `pi-dance.ini` to localize or brand the title and point the game at the
+external prepared song directory:
 
 ```ini
-[game]
-title = Dance, dance, spin around!
-
 [songs]
 directory = /home/matej/pi-dance-songs
+```
+
+Start the game from the project directory so it reads that local configuration:
+
+```bash
+.venv/bin/pi-dance
 ```
 
 The initial scaffold currently provides the portable application shell. Song discovery, chart parsing, audio playback and scoring will be added incrementally.
