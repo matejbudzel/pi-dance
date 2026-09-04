@@ -99,7 +99,8 @@ The [`matejbudzel/pi-286-games`](https://github.com/matejbudzel/pi-286-games) re
 
 ## Audio and songs
 
-Runtime audio is uncompressed WAV so the Pi does not need to decode MP3 during gameplay.
+Runtime audio is 22.05 kHz, 16-bit PCM stereo WAV. This is deliberately a
+low-bandwidth format for the Pi while avoiding MP3 decoding during gameplay.
 
 No copyrighted music or community chart files belong in this repository. The game loads song bundles from a configurable external directory.
 
@@ -134,7 +135,9 @@ image when possible; otherwise a bundled generic cover is used.
 
 Running the tool again is safe: it fills each missing WAV, cover, and metadata
 field independently, while retaining existing metadata values so locally edited
-titles remain intact. Use `--overwrite` only to regenerate every derived file.
+titles remain intact. Existing WAVs in another codec, sample rate, or channel
+layout are automatically regenerated to the runtime format. Use `--overwrite`
+only to regenerate every derived file regardless of its current format.
 
 Prepare downloaded bundles on a desktop machine with ffmpeg installed:
 

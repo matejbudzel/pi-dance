@@ -20,6 +20,9 @@ from pathlib import Path
 
 AUDIO_EXTENSIONS = (".ogg", ".mp3")
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp")
+WAV_CODEC = "pcm_s16le"
+WAV_SAMPLE_RATE = 22050
+WAV_CHANNELS = 2
 DIFFICULTY_ORDER = {
     "beginner": 0,
     "easy": 1,
@@ -125,6 +128,42 @@ def audio_duration_seconds(audio_path: Path) -> float:
     return round(float(result.stdout.strip()), 3)
 
 
+def is_runtime_wav_format(stream: dict[str, object]) -> bool:
+    return (
+        stream.get("codec_name") == WAV_CODEC
+        and stream.get("sample_rate") == str(WAV_SAMPLE_RATE)
+        and stream.get("channels") == WAV_CHANNELS
+    )
+
+
+def wav_matches_runtime_format(wav_path: Path) -> bool:
+    """Return whether an existing WAV already uses the Pi runtime format."""
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "a:0",
+            "-show_entries",
+            "stream=codec_name,sample_rate,channels",
+            "-of",
+            "json",
+            str(wav_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        return False
+    try:
+        streams = json.loads(result.stdout).get("streams", [])
+    except json.JSONDecodeError:
+        return False
+    return len(streams) == 1 and is_runtime_wav_format(streams[0])
+
+
 def existing_metadata(metadata_path: Path) -> dict[str, object]:
     if not metadata_path.exists():
         return {}
@@ -191,12 +230,12 @@ def prepare_song(song_dir: Path, overwrite: bool, dry_run: bool) -> None:
     }
     existing = existing_metadata(metadata_path)
     metadata = merged_metadata(metadata, existing, overwrite)
-    needs_wav = overwrite or not wav_path.exists()
+    needs_wav = overwrite or not wav_path.exists() or not wav_matches_runtime_format(wav_path)
     needs_cover = overwrite or not cover_path.exists()
     needs_metadata = overwrite or not metadata_path.exists() or metadata != existing
 
     actions = [
-        f"WAV {'create' if needs_wav else 'keep'}",
+        f"WAV {'create' if not wav_path.exists() else 'regenerate' if needs_wav else 'keep'}",
         f"cover {'create' if needs_cover else 'keep'}",
         f"metadata {'write' if needs_metadata else 'keep'}",
     ]
@@ -206,7 +245,7 @@ def prepare_song(song_dir: Path, overwrite: bool, dry_run: bool) -> None:
 
     if needs_wav:
         subprocess.run(
-            ["ffmpeg", "-v", "error", "-y", "-i", str(source_audio), "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2", str(wav_path)],
+            ["ffmpeg", "-v", "error", "-y", "-i", str(source_audio), "-acodec", WAV_CODEC, "-ar", str(WAV_SAMPLE_RATE), "-ac", str(WAV_CHANNELS), str(wav_path)],
             check=True,
         )
     if needs_cover:

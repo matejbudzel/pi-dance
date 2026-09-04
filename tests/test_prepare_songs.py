@@ -47,3 +47,8 @@ class PrepareSongsTests(unittest.TestCase):
             (bundle / "song.bmp").touch()
 
             self.assertEqual(prepare_songs.input_cover(bundle).name, "Example-jacket.png")
+
+    def test_recognises_only_the_low_bandwidth_runtime_wav_format(self) -> None:
+        self.assertTrue(prepare_songs.is_runtime_wav_format({"codec_name": "pcm_s16le", "sample_rate": "22050", "channels": 2}))
+        self.assertFalse(prepare_songs.is_runtime_wav_format({"codec_name": "pcm_s16le", "sample_rate": "44100", "channels": 2}))
+        self.assertFalse(prepare_songs.is_runtime_wav_format({"codec_name": "pcm_s16le", "sample_rate": "22050", "channels": 1}))
