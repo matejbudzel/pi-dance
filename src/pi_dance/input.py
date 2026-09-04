@@ -12,6 +12,11 @@ class Action(Enum):
     DOWN = auto()
     START = auto()
     SELECT = auto()
+    DEBUG_RESULT_1 = auto()
+    DEBUG_RESULT_2 = auto()
+    DEBUG_RESULT_3 = auto()
+    DEBUG_RESULT_4 = auto()
+    DEBUG_RESULT_5 = auto()
 
 
 KEY_ACTIONS = {
@@ -22,6 +27,11 @@ KEY_ACTIONS = {
     pygame.K_RETURN: Action.START,
     pygame.K_SPACE: Action.START,
     pygame.K_ESCAPE: Action.SELECT,
+    pygame.K_1: Action.DEBUG_RESULT_1,
+    pygame.K_2: Action.DEBUG_RESULT_2,
+    pygame.K_3: Action.DEBUG_RESULT_3,
+    pygame.K_4: Action.DEBUG_RESULT_4,
+    pygame.K_5: Action.DEBUG_RESULT_5,
 }
 
 

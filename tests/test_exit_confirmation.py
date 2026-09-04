@@ -56,3 +56,13 @@ class ExitConfirmationTests(unittest.TestCase):
         self.assertIs(self.app.feedback, Judgement.MISS)
         self.assertEqual(self.app.session.judgements, [])
         self.assertGreater(self.app.receptor_glow_until["left"], pygame.time.get_ticks())
+
+    def test_debug_result_key_opens_requested_star_result(self) -> None:
+        self.app.current_screen = Screen.PLAYING
+
+        with patch("pi_dance.app.pygame.mixer.music.stop") as stop:
+            self.app._handle_action(Action.DEBUG_RESULT_4)
+
+        stop.assert_called_once()
+        self.assertIs(self.app.current_screen, Screen.RESULT)
+        self.assertEqual(self.app.result_stars, 4)

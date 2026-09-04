@@ -36,6 +36,14 @@ ACTION_DIRECTIONS = {
     Action.RIGHT: "right",
 }
 
+DEBUG_RESULT_STARS = {
+    Action.DEBUG_RESULT_1: 1,
+    Action.DEBUG_RESULT_2: 2,
+    Action.DEBUG_RESULT_3: 3,
+    Action.DEBUG_RESULT_4: 4,
+    Action.DEBUG_RESULT_5: 5,
+}
+
 
 class App:
     def __init__(self) -> None:
@@ -94,6 +102,9 @@ class App:
                 self._handle_action(action)
 
     def _handle_action(self, action: Action) -> None:
+        if action in DEBUG_RESULT_STARS and self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING, Screen.PAUSED):
+            self._show_debug_result(DEBUG_RESULT_STARS[action])
+            return
         if action is Action.SELECT:
             self._handle_select()
             return
@@ -222,6 +233,12 @@ class App:
         self.feedback = None
         self.playback_started = False
         self.result_stars = 0
+
+    def _show_debug_result(self, stars: int) -> None:
+        pygame.mixer.music.stop()
+        self.result_stars = stars
+        self.result_started_at = pygame.time.get_ticks()
+        self.current_screen = Screen.RESULT
 
     def _render(self) -> None:
         self.screen.fill(BACKGROUND)
