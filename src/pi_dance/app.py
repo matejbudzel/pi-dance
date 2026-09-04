@@ -217,21 +217,28 @@ class App:
         self._render_confirmation_buttons(SETTINGS.exit_confirm_button, SETTINGS.exit_cancel_button, self.exit_confirmation_selected, 286)
 
     def _render_gameplay(self) -> None:
-        self.screen.blit(self.rainbow_title, (40, 28))
+        self._render_gameplay_header()
         for index, direction in enumerate(("left", "down", "up", "right")):
             receptor = self.receptors[direction]
-            self.screen.blit(receptor, receptor.get_rect(center=(APP_WIDTH // 2 - 142 + index * 84, 130)))
+            self.screen.blit(receptor, receptor.get_rect(center=(APP_WIDTH // 2 - 142 + index * 84, 132)))
+
+    def _render_gameplay_header(self) -> None:
+        if self.active_song is None:
+            return
+        pygame.draw.rect(self.screen, self.active_song.focus_color, pygame.Rect(0, 0, APP_WIDTH, 92))
         self._render_progress_bar()
+        title = self.list_font.render(self.active_song.title, True, FOREGROUND)
+        self.screen.blit(title, (40, 42))
 
     def _render_progress_bar(self) -> None:
-        rect = pygame.Rect(60, APP_HEIGHT - 44, APP_WIDTH - 120, 14)
-        pygame.draw.rect(self.screen, (85, 85, 85), rect, width=2)
+        rect = pygame.Rect(40, 16, APP_WIDTH - 80, 12)
+        pygame.draw.rect(self.screen, FOREGROUND, rect, width=2)
         if self.active_song is not None:
             ratio = min(1.0, self._song_position_seconds() / self.active_song.duration_seconds)
             if ratio > 0:
                 fill = rect.copy()
                 fill.width = max(1, round(rect.width * ratio))
-                pygame.draw.rect(self.screen, self.active_song.focus_color, fill)
+                pygame.draw.rect(self.screen, FOREGROUND, fill)
 
     def _render_countdown(self) -> None:
         number = self.question_font.render(str(self._countdown_remaining()), True, FOREGROUND)
