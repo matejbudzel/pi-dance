@@ -77,11 +77,12 @@ class FbdevPresenter:
             self._bytes_per_pixel = variable.bits_per_pixel // 8
             self._map = mmap.mmap(self._descriptor, fixed.smem_len, access=mmap.ACCESS_WRITE)
             self._framebuffer_offset = variable.yoffset * fixed.line_length + variable.xoffset * self._bytes_per_pixel
-            masks = (_bitmask(variable.red), _bitmask(variable.green), _bitmask(variable.blue), _bitmask(variable.transp))
-            self._surface = pygame.Surface((variable.xres, variable.yres), depth=16, masks=masks)
+            self._masks = (_bitmask(variable.red), _bitmask(variable.green), _bitmask(variable.blue), _bitmask(variable.transp))
+            self._surface = pygame.Surface((variable.xres, variable.yres), depth=16, masks=self._masks)
             self._canvas_rect = pygame.Rect((variable.xres - canvas_size[0]) // 2, (variable.yres - canvas_size[1]) // 2, *canvas_size)
+            self._canvas = pygame.Surface(canvas_size, depth=16, masks=self._masks)
             self._surface.fill((0, 0, 0))
-            self._copy_rows(pygame.Rect(0, 0, variable.xres, variable.yres))
+            self._copy_rows(self._surface, pygame.Rect(0, 0, variable.xres, variable.yres))
         except BaseException:
             os.close(self._descriptor)
             raise
@@ -89,8 +90,15 @@ class FbdevPresenter:
     def present(self, canvas: pygame.Surface) -> None:
         if canvas.get_size() != self._canvas_rect.size:
             raise FramebufferError(f"canvas changed to {canvas.get_size()}, expected {self._canvas_rect.size}")
+        if self._canvas_rect == self._surface.get_rect():
+            self._copy_rows(canvas, canvas.get_rect())
+            return
         self._surface.blit(canvas, self._canvas_rect)
-        self._copy_rows(self._canvas_rect)
+        self._copy_rows(self._surface, self._canvas_rect)
+
+    @property
+    def canvas(self) -> pygame.Surface:
+        return self._canvas
 
     def close(self) -> None:
         if hasattr(self, "_map"):
@@ -99,10 +107,10 @@ class FbdevPresenter:
             os.close(self._descriptor)
             del self._descriptor
 
-    def _copy_rows(self, rectangle: pygame.Rect) -> None:
-        pixels = bytes(self._surface.get_view("0"))
-        source_pitch = self._surface.get_pitch()
-        if rectangle == self._surface.get_rect() and source_pitch == self._line_length:
+    def _copy_rows(self, surface: pygame.Surface, rectangle: pygame.Rect) -> None:
+        pixels = bytes(surface.get_view("0"))
+        source_pitch = surface.get_pitch()
+        if rectangle == surface.get_rect() and source_pitch == self._line_length:
             byte_count = source_pitch * rectangle.height
             self._map[self._framebuffer_offset:self._framebuffer_offset + byte_count] = pixels[:byte_count]
             return

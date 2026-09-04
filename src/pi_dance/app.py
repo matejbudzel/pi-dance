@@ -55,8 +55,13 @@ class App:
         pygame.mixer.pre_init(MIXER_FREQUENCY, -16, 2, MIXER_BUFFER_SAMPLES)
         pygame.init()
         pygame.display.set_caption(WINDOW_TITLE)
-        self.screen = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT))
-        self.framebuffer = self._open_framebuffer_presenter()
+        if SETTINGS.display_backend == "fbdev":
+            pygame.display.set_mode((1, 1))
+            self.framebuffer = self._open_framebuffer_presenter()
+            self.screen = self.framebuffer.canvas
+        else:
+            self.screen = pygame.display.set_mode((APP_WIDTH, APP_HEIGHT))
+            self.framebuffer = None
         self.clock = pygame.time.Clock()
         self.running = True
         self.current_screen = Screen.SPLASH
