@@ -103,13 +103,14 @@ Runtime audio is uncompressed WAV so the Pi does not need to decode MP3 during g
 
 No copyrighted music or community chart files belong in this repository. The game loads song bundles from a configurable external directory.
 
-A song bundle is expected to look roughly like this:
+A downloaded bundle may retain its original files, but the preparation script
+creates these two runtime files alongside them:
 
 ```text
 love-story/
   song.wav
-  chart.sm
   song.json
+  Love Story.sm
 ```
 
 Example metadata:
@@ -124,7 +125,22 @@ Example metadata:
 }
 ```
 
-The exact schema may evolve while the first real community charts are integrated.
+`song.json` is the authoritative application metadata. It includes the displayed
+title, artist, duration, generated WAV filename, source `.sm` filename, selected
+chart difficulty/meter, and the download URL retained from the original `.txt`
+file. The exact schema may evolve while the first real community charts are integrated.
+
+Prepare downloaded bundles on a desktop machine with ffmpeg installed:
+
+```bash
+python3 scripts/prepare_songs.py ~/pi-dance-songs --dry-run
+python3 scripts/prepare_songs.py ~/pi-dance-songs
+```
+
+It chooses the easiest available `dance-single` chart entry in each `.sm` file.
+The future chart loader should still expose every available chart; the MVP song
+list simply uses the choice recorded in the metadata. The script will not replace
+generated files unless `--overwrite` is given.
 
 ## Chart philosophy
 
