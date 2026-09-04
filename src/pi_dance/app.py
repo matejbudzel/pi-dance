@@ -86,9 +86,10 @@ class App:
                     self._handle_events()
                     self._update()
                     self._render()
-                    pygame.display.flip()
                     if self.framebuffer is not None:
                         self.framebuffer.present(self.screen)
+                    else:
+                        pygame.display.flip()
                     self.clock.tick(TARGET_FPS)
         finally:
             pygame.mixer.music.stop()

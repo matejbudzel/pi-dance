@@ -102,6 +102,10 @@ class FbdevPresenter:
     def _copy_rows(self, rectangle: pygame.Rect) -> None:
         pixels = bytes(self._surface.get_view("0"))
         source_pitch = self._surface.get_pitch()
+        if rectangle == self._surface.get_rect() and source_pitch == self._line_length:
+            byte_count = source_pitch * rectangle.height
+            self._map[self._framebuffer_offset:self._framebuffer_offset + byte_count] = pixels[:byte_count]
+            return
         row_width = rectangle.width * self._bytes_per_pixel
         for row in range(rectangle.height):
             source_start = (rectangle.y + row) * source_pitch + rectangle.x * self._bytes_per_pixel
