@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import colorsys
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +13,13 @@ from pathlib import Path
 class Song:
     title: str
     path: Path
+    focus_color: tuple[int, int, int]
+
+
+def focus_color_for_title(title: str) -> tuple[int, int, int]:
+    """Create a stable, high-contrast colour from a song's displayed title."""
+    hue = int.from_bytes(hashlib.blake2s(title.encode("utf-8"), digest_size=2).digest(), "big") / 65536
+    return tuple(round(channel * 255) for channel in colorsys.hsv_to_rgb(hue, 0.72, 1.0))
 
 
 def discover_songs(song_directory: Path) -> list[Song]:
@@ -40,5 +49,6 @@ def discover_songs(song_directory: Path) -> list[Song]:
             continue
         if not (bundle / audio).is_file() or not (bundle / chart).is_file():
             continue
-        songs.append(Song(title=title.strip(), path=bundle))
+        clean_title = title.strip()
+        songs.append(Song(title=clean_title, path=bundle, focus_color=focus_color_for_title(clean_title)))
     return sorted(songs, key=lambda song: song.title.casefold())

@@ -98,10 +98,11 @@ class App:
         for row, song in enumerate(self.songs[self.first_visible : self.first_visible + self._visible_rows()]):
             y = 118 + row * 44
             index = self.first_visible + row
+            color = song.focus_color if index == self.selected else FOREGROUND
             if index == self.selected:
-                chevron = self.list_font.render(">", True, FOREGROUND)
+                chevron = self.list_font.render(">", True, color)
                 self.screen.blit(chevron, (64, y))
-            title = self.list_font.render(song.title, True, FOREGROUND)
+            title = self.list_font.render(song.title, True, color)
             self.screen.blit(title, (104, y))
 
     def _visible_rows(self) -> int:

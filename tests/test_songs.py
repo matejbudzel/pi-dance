@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from pi_dance.songs import discover_songs
+from pi_dance.songs import discover_songs, focus_color_for_title
 
 
 class SongDiscoveryTests(unittest.TestCase):
@@ -17,6 +17,13 @@ class SongDiscoveryTests(unittest.TestCase):
             songs = discover_songs(root)
 
         self.assertEqual([song.title for song in songs], ["Apple", "Zebra"])
+
+    def test_focus_color_is_stable_and_bright(self) -> None:
+        color = focus_color_for_title("How Far I'll Go")
+
+        self.assertEqual(color, focus_color_for_title("How Far I'll Go"))
+        self.assertNotEqual(color, focus_color_for_title("Shake It Off"))
+        self.assertGreaterEqual(max(color), 230)
 
     @staticmethod
     def _write_song(root: Path, name: str, title: str, audio: bool = True) -> None:
