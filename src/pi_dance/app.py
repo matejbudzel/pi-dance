@@ -90,6 +90,7 @@ class App:
         self.modal_snapshot: pygame.Surface | None = None
         self.gameplay_base: pygame.Surface | None = None
         self.gameplay_base_song: Song | None = None
+        self.gameplay_needs_full_restore = False
         self._last_visual_signature: tuple[object, ...] | None = None
 
     def run(self) -> None:
@@ -164,13 +165,13 @@ class App:
         elif self.current_screen is Screen.PLAYING and action is Action.START:
             pygame.mixer.music.pause()
             self.current_screen = Screen.PAUSED
-            self.modal_snapshot = None
+            self._invalidate_modal_snapshot()
         elif self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING) and action in ACTION_DIRECTIONS:
             self._handle_direction(ACTION_DIRECTIONS[action])
         elif self.current_screen is Screen.PAUSED and action is Action.START:
             pygame.mixer.music.unpause()
             self.current_screen = Screen.PLAYING
-            self.modal_snapshot = None
+            self._invalidate_modal_snapshot()
         elif self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
             self._handle_song_exit_action(action)
         elif self.current_screen is Screen.RESULT and action is Action.START:
@@ -195,7 +196,7 @@ class App:
                 pygame.mixer.music.pause()
             self.song_exit_confirmation_selected = False
             self.current_screen = Screen.SONG_EXIT_CONFIRMATION
-            self.modal_snapshot = None
+            self._invalidate_modal_snapshot()
 
     def _handle_song_list_action(self, action: Action) -> None:
         if action is Action.UP:
@@ -222,7 +223,7 @@ class App:
     def _handle_song_exit_action(self, action: Action) -> None:
         if action in (Action.LEFT, Action.RIGHT, Action.UP, Action.DOWN):
             self.song_exit_confirmation_selected = not self.song_exit_confirmation_selected
-            self.modal_snapshot = None
+            self._invalidate_modal_snapshot()
         elif action is Action.START:
             if self.song_exit_confirmation_selected:
                 self._stop_song()
@@ -246,6 +247,7 @@ class App:
         self.active_song = song
         self.gameplay_base = None
         self.gameplay_base_song = None
+        self.gameplay_needs_full_restore = False
         self.session = Session(self.active_chart.notes)
         self.feedback = None
         self.playback_started = False
@@ -274,6 +276,11 @@ class App:
         elif self.song_exit_return_screen is Screen.PLAYING:
             pygame.mixer.music.unpause()
         self.current_screen = self.song_exit_return_screen
+        self._invalidate_modal_snapshot()
+
+    def _invalidate_modal_snapshot(self) -> None:
+        self.modal_snapshot = None
+        self.gameplay_needs_full_restore = True
 
     def _stop_song(self) -> None:
         pygame.mixer.music.stop()
@@ -323,7 +330,10 @@ class App:
                 if self.gameplay_base is None or self.gameplay_base_song != self.active_song:
                     self.gameplay_base = views.create_gameplay_base(self.screen, self.assets, self.active_song)
                     self.gameplay_base_song = self.active_song
+                    self.gameplay_needs_full_restore = True
+                if self.gameplay_needs_full_restore:
                     self.screen.blit(self.gameplay_base, (0, 0))
+                    self.gameplay_needs_full_restore = False
                 views.render_cached_gameplay(self.screen, self.gameplay_base, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms, countdown)
             else:
                 views.render_gameplay(self.screen, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms)
