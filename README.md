@@ -307,6 +307,9 @@ With this backend the game also claims the active Linux console while it runs:
 the terminal cursor disappears, keyboard input is read directly, and the known
 dance pad is read from `/dev/input/js*`. The user needs access to `input` as
 well as `video`; log out and back in after `sudo usermod -aG input "$USER"`.
+If the pad does not respond, quit the game after pressing a few pad buttons and
+inspect `cat /tmp/pi-dance-input.txt`. It reports every joystick considered,
+permission/recognition failures, and received mapped button presses.
 
 ## Font
 
