@@ -8,8 +8,10 @@ from enum import Enum, auto
 from .charts import Note
 
 
-GREAT_WINDOW_SECONDS = 0.10
-OK_WINDOW_SECONDS = 0.18
+GREAT_WINDOW_SECONDS = 0.13
+OK_WINDOW_SECONDS = 0.28
+DOUBLE_TAP_SECONDS = 0.12
+CLOSE_NOTE_GAP_SECONDS = 0.16
 
 
 class Judgement(Enum):
@@ -30,8 +32,13 @@ class Session:
     def __init__(self, notes: tuple[Note, ...]) -> None:
         self.pending = list(notes)
         self.judgements: list[JudgedNote] = []
+        self.last_press_was_ignored = False
+        self._last_successful_press: tuple[float, Note] | None = None
 
     def press(self, direction: str, song_time: float) -> JudgedNote | None:
+        self.last_press_was_ignored = self._is_accidental_double_tap(song_time)
+        if self.last_press_was_ignored:
+            return None
         candidates = [
             note
             for note in self.pending
@@ -44,7 +51,17 @@ class Session:
         judgement = Judgement.GREAT if abs(note.timestamp - song_time) <= GREAT_WINDOW_SECONDS else Judgement.OK
         result = JudgedNote(note=note, judgement=judgement)
         self.judgements.append(result)
+        self._last_successful_press = (song_time, note)
         return result
+
+    def _is_accidental_double_tap(self, song_time: float) -> bool:
+        if self._last_successful_press is None:
+            return False
+        previous_time, previous_note = self._last_successful_press
+        if not 0 < song_time - previous_time <= DOUBLE_TAP_SECONDS:
+            return False
+        next_note = self.pending[0] if self.pending else None
+        return next_note is None or next_note.timestamp - previous_note.timestamp > CLOSE_NOTE_GAP_SECONDS
 
     def expire(self, song_time: float) -> list[JudgedNote]:
         expired: list[JudgedNote] = []

@@ -237,6 +237,8 @@ class App:
         self.receptor_glow_until[direction] = pygame.time.get_ticks() + RECEPTOR_GLOW_DURATION_MS
         if self.current_screen is Screen.PLAYING and self.session is not None:
             result = self.session.press(direction, self._song_position_seconds())
+            if result is None and self.session.last_press_was_ignored:
+                return
             self._show_feedback(Judgement.MISS if result is None else result.judgement)
 
     def _prepare_song(self, song: Song) -> None:
@@ -373,7 +375,7 @@ class App:
         elif self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING):
             dirty = self.gameplay_present_rectangles
         elif self.current_screen is Screen.RESULT:
-            dirty = [pygame.Rect(220, 200, 500, 160)]
+            dirty = [pygame.Rect(220, 160, 500, 160)]
         else:
             dirty = []
         if self.show_performance_hud and hud not in dirty:
