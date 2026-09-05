@@ -88,6 +88,7 @@ class App:
         self.show_performance_hud = False
         self.performance = PerformanceTracker()
         self.modal_snapshot: pygame.Surface | None = None
+        self._last_visual_signature: tuple[object, ...] | None = None
 
     def run(self) -> None:
         console_input = ConsoleInput() if self.framebuffer is not None else None
@@ -103,7 +104,7 @@ class App:
                     self._render()
                     render_finished = pygame.time.get_ticks()
                     if self.framebuffer is not None:
-                        self.framebuffer.present(self.screen)
+                        self.framebuffer.present(self.screen, self._dirty_rectangles())
                     else:
                         pygame.display.flip()
                     present_finished = pygame.time.get_ticks()
@@ -315,6 +316,36 @@ class App:
             self.modal_snapshot = self.screen.copy()
         if self.show_performance_hud:
             views.render_performance_hud(self.screen, self.assets, self.performance.latest)
+
+    def _dirty_rectangles(self) -> list[pygame.Rect]:
+        signature = (
+            self.current_screen,
+            self.selected,
+            self.first_visible_row,
+            self.exit_confirmation_selected,
+            self.song_exit_confirmation_selected,
+            self.show_performance_hud,
+        )
+        full_screen = pygame.Rect(0, 0, APP_WIDTH, APP_HEIGHT)
+        hud = pygame.Rect(APP_WIDTH - 350, APP_HEIGHT - 80, 350, 80)
+        if signature != self._last_visual_signature:
+            dirty = [full_screen]
+        elif self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING):
+            dirty = [
+                pygame.Rect(views.LANE_START_X - 28, views.HEADER_HEIGHT, views.LANE_SPACING * 3 + 56, APP_HEIGHT - views.HEADER_HEIGHT),
+                pygame.Rect(40, 16, APP_WIDTH - 80, 12),
+                pygame.Rect(660, 100, 170, 145),
+            ]
+            if self.current_screen is Screen.COUNTDOWN:
+                dirty.append(pygame.Rect(APP_WIDTH // 2 - 70, APP_HEIGHT // 2 - 70, 140, 140))
+        elif self.current_screen is Screen.RESULT:
+            dirty = [pygame.Rect(220, 200, 500, 160)]
+        else:
+            dirty = []
+        if self.show_performance_hud and hud not in dirty:
+            dirty.append(hud)
+        self._last_visual_signature = signature
+        return dirty
 
     def _song_position_seconds(self) -> float:
         return self._audio_position_seconds() + SETTINGS.timing_offset_ms / 1000

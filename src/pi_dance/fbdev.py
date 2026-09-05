@@ -82,19 +82,25 @@ class FbdevPresenter:
             self._canvas_rect = pygame.Rect((variable.xres - canvas_size[0]) // 2, (variable.yres - canvas_size[1]) // 2, *canvas_size)
             self._canvas = pygame.Surface(canvas_size, depth=16, masks=self._masks)
             self._surface.fill((0, 0, 0))
-            self._copy_rows(self._surface, pygame.Rect(0, 0, variable.xres, variable.yres))
+            self._copy_rectangles(self._surface, [pygame.Rect(0, 0, variable.xres, variable.yres)])
         except BaseException:
             os.close(self._descriptor)
             raise
 
-    def present(self, canvas: pygame.Surface) -> None:
+    def present(self, canvas: pygame.Surface, rectangles: list[pygame.Rect] | None = None) -> None:
         if canvas.get_size() != self._canvas_rect.size:
             raise FramebufferError(f"canvas changed to {canvas.get_size()}, expected {self._canvas_rect.size}")
-        if self._canvas_rect == self._surface.get_rect():
-            self._copy_rows(canvas, canvas.get_rect())
+        dirty = [rectangle.clip(canvas.get_rect()) for rectangle in (rectangles or [canvas.get_rect()])]
+        dirty = [rectangle for rectangle in dirty if rectangle.width and rectangle.height]
+        if not dirty:
             return
-        self._surface.blit(canvas, self._canvas_rect)
-        self._copy_rows(self._surface, self._canvas_rect)
+        if self._canvas_rect == self._surface.get_rect():
+            self._copy_rectangles(canvas, dirty)
+            return
+        for rectangle in dirty:
+            destination = rectangle.move(self._canvas_rect.topleft)
+            self._surface.blit(canvas, destination, rectangle)
+            self._copy_rectangles(self._surface, [destination])
 
     @property
     def canvas(self) -> pygame.Surface:
@@ -107,15 +113,16 @@ class FbdevPresenter:
             os.close(self._descriptor)
             del self._descriptor
 
-    def _copy_rows(self, surface: pygame.Surface, rectangle: pygame.Rect) -> None:
-        pixels = bytes(surface.get_view("0"))
+    def _copy_rectangles(self, surface: pygame.Surface, rectangles: list[pygame.Rect]) -> None:
         source_pitch = surface.get_pitch()
-        if rectangle == surface.get_rect() and source_pitch == self._line_length:
-            byte_count = source_pitch * rectangle.height
-            self._map[self._framebuffer_offset:self._framebuffer_offset + byte_count] = pixels[:byte_count]
+        if len(rectangles) == 1 and rectangles[0] == surface.get_rect() and source_pitch == self._line_length:
+            pixels = bytes(surface.get_view("0"))
+            self._map[self._framebuffer_offset:self._framebuffer_offset + source_pitch * surface.get_height()] = pixels
             return
-        row_width = rectangle.width * self._bytes_per_pixel
-        for row in range(rectangle.height):
-            source_start = (rectangle.y + row) * source_pitch + rectangle.x * self._bytes_per_pixel
-            target_start = self._framebuffer_offset + (rectangle.y + row) * self._line_length + rectangle.x * self._bytes_per_pixel
-            self._map[target_start:target_start + row_width] = pixels[source_start:source_start + row_width]
+        pixels = memoryview(surface.get_view("0")).cast("B")
+        for rectangle in rectangles:
+            row_width = rectangle.width * self._bytes_per_pixel
+            for row in range(rectangle.height):
+                source_start = (rectangle.y + row) * source_pitch + rectangle.x * self._bytes_per_pixel
+                target_start = self._framebuffer_offset + (rectangle.y + row) * self._line_length + rectangle.x * self._bytes_per_pixel
+                self._map[target_start:target_start + row_width] = pixels[source_start:source_start + row_width]
