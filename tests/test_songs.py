@@ -26,6 +26,16 @@ class SongDiscoveryTests(unittest.TestCase):
         self.assertNotEqual(color, focus_color_for_title("Shake It Off"))
         self.assertGreaterEqual(max(color), 230)
 
+    def test_legacy_difficulty_fields_are_ignored(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_song(root, "legacy", "Legacy")
+            path = root / "legacy" / "song.json"
+            metadata = json.loads(path.read_text())
+            metadata.update(chart_difficulty="Hard", chart_meter="unused")
+            path.write_text(json.dumps(metadata))
+            self.assertEqual([song.title for song in discover_songs(root)], ["Legacy"])
+
     @staticmethod
     def _write_song(root: Path, name: str, title: str, audio: bool = True) -> None:
         bundle = root / name
@@ -35,8 +45,6 @@ class SongDiscoveryTests(unittest.TestCase):
             "audio": "song.wav",
             "chart": "chart.sm",
             "duration_seconds": 120,
-            "chart_difficulty": "Beginner",
-            "chart_meter": 1,
         }))
         (bundle / "chart.sm").touch()
         if audio:

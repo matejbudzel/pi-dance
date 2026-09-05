@@ -18,8 +18,6 @@ class Song:
     chart_path: Path
     cover_path: Path
     duration_seconds: float
-    chart_difficulty: str
-    chart_meter: int
 
 
 def focus_color_for_title(title: str) -> tuple[int, int, int]:
@@ -53,15 +51,11 @@ def discover_songs(song_directory: Path) -> list[Song]:
             chart = metadata["chart"]
             cover = metadata.get("cover", "song.bmp")
             duration_seconds = float(metadata["duration_seconds"])
-            chart_difficulty = metadata["chart_difficulty"]
-            chart_meter = int(metadata["chart_meter"])
         except (OSError, json.JSONDecodeError, KeyError, TypeError):
             continue
         if not isinstance(title, str) or not title.strip():
             continue
         if not isinstance(audio, str) or not isinstance(chart, str) or not isinstance(cover, str) or duration_seconds <= 0:
-            continue
-        if not isinstance(chart_difficulty, str):
             continue
         if not (bundle / audio).is_file() or not (bundle / chart).is_file():
             continue
@@ -78,8 +72,6 @@ def discover_songs(song_directory: Path) -> list[Song]:
                 chart_path=bundle / chart,
                 cover_path=resolved_cover,
                 duration_seconds=duration_seconds,
-                chart_difficulty=chart_difficulty,
-                chart_meter=chart_meter,
             )
         )
     return sorted(songs, key=lambda song: song.title.casefold())

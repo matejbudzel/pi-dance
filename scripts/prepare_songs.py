@@ -16,6 +16,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 AUDIO_EXTENSIONS = (".ogg", ".mp3")
@@ -77,10 +78,18 @@ def source_url(song_dir: Path) -> str | None:
     return None
 
 
-def input_audio(song_dir: Path) -> Path:
-    audio = [path for path in song_dir.iterdir() if path.suffix.lower() in AUDIO_EXTENSIONS]
+def input_audio(song_dir: Path, music: str | None = None) -> Path:
+    if music:
+        path = song_dir / music.replace("\\", "/")
+        if not path.resolve().is_relative_to(song_dir.resolve()):
+            raise ValueError("chart MUSIC path escapes song directory")
+        if path.is_file() and path.suffix.lower() in (*AUDIO_EXTENSIONS, ".wav"):
+            return path
+    audio = [path for path in song_dir.iterdir()
+             if path.is_file() and path.suffix.lower() in (*AUDIO_EXTENSIONS, ".wav")
+             and path.name != "song.wav"]
     if len(audio) != 1:
-        raise ValueError(f"expected exactly one MP3 or OGG file, found {len(audio)}")
+        raise ValueError(f"expected exactly one source MP3, OGG or WAV file, found {len(audio)}")
     return audio[0]
 
 
@@ -208,7 +217,7 @@ def prepare_song(song_dir: Path, overwrite: bool, dry_run: bool) -> None:
     sm_path = sm_files[0]
     sm_contents = sm_path.read_text(encoding="utf-8-sig")
     choice = easiest_dance_single(sm_contents)
-    source_audio = input_audio(song_dir)
+    source_audio = input_audio(song_dir, sm_tag(sm_contents, "MUSIC"))
     wav_path = song_dir / "song.wav"
     cover_path = song_dir / "song.bmp"
     metadata_path = song_dir / "song.json"
@@ -223,8 +232,6 @@ def prepare_song(song_dir: Path, overwrite: bool, dry_run: bool) -> None:
         "audio": wav_path.name,
         "chart": sm_path.name,
         "chart_style": "dance-single",
-        "chart_difficulty": choice.difficulty,
-        "chart_meter": choice.meter,
         "cover": cover_path.name,
         "source_url": source_url(song_dir),
     }
@@ -243,18 +250,27 @@ def prepare_song(song_dir: Path, overwrite: bool, dry_run: bool) -> None:
     if dry_run:
         return
 
-    if needs_wav:
-        subprocess.run(
-            ["ffmpeg", "-v", "error", "-y", "-i", str(source_audio), "-acodec", WAV_CODEC, "-ar", str(WAV_SAMPLE_RATE), "-ac", str(WAV_CHANNELS), str(wav_path)],
-            check=True,
-        )
-    if needs_cover:
-        if source_cover is not None:
-            create_cover(source_cover, cover_path)
-        else:
-            shutil.copyfile(fallback_cover_path(), cover_path)
-    if needs_metadata:
-        metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    # Interrupted conversions must not leave partial files that a rerun keeps.
+    with TemporaryDirectory(prefix=".prepare-", dir=song_dir) as temporary:
+        staging = Path(temporary)
+        if needs_wav:
+            converted = staging / "song.wav"
+            subprocess.run(
+                ["ffmpeg", "-v", "error", "-y", "-i", str(source_audio), "-acodec", WAV_CODEC, "-ar", str(WAV_SAMPLE_RATE), "-ac", str(WAV_CHANNELS), str(converted)],
+                check=True,
+            )
+            converted.replace(wav_path)
+        if needs_cover:
+            converted = staging / "song.bmp"
+            if source_cover is not None:
+                create_cover(source_cover, converted)
+            else:
+                shutil.copyfile(fallback_cover_path(), converted)
+            converted.replace(cover_path)
+        if needs_metadata:
+            converted = staging / "song.json"
+            converted.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+            converted.replace(metadata_path)
 
 
 def main() -> int:
@@ -265,7 +281,8 @@ def main() -> int:
     args = parser.parse_args()
 
     failures = 0
-    for song_dir in sorted(path for path in args.song_directory.iterdir() if path.is_dir()):
+    for song_dir in sorted(path for path in args.song_directory.iterdir()
+                           if path.is_dir() and not path.name.startswith(".")):
         try:
             prepare_song(song_dir, args.overwrite, args.dry_run)
         except (OSError, subprocess.CalledProcessError, ValueError) as error:

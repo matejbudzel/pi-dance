@@ -18,7 +18,7 @@ class DifficultySelectionTests(unittest.TestCase):
     def setUp(self) -> None:
         self.app = App()
         self.song = Song("Example", Path("."), (255, 100, 150), Path("song.wav"),
-                         Path("chart.sm"), fallback_cover_path(), 30, "Hard", 8)
+                         Path("chart.sm"), fallback_cover_path(), 30)
         self.app.assets.covers[self.song.path] = pygame.image.load(fallback_cover_path()).convert()
         self.easy = Chart("Beginner", 1, (Note(1, "left"),))
         self.hard = Chart("Hard", 8, (Note(2, "right"),))

@@ -50,7 +50,7 @@ class HoldInputRenderingTests(unittest.TestCase):
 
     def test_framebuffer_receives_tail_cleanup_after_release(self) -> None:
         song = Song("Example", Path("."), (255, 100, 150), Path("song.wav"),
-                    Path("chart.sm"), fallback_cover_path(), 30, "Easy", 2)
+                    Path("chart.sm"), fallback_cover_path(), 30)
         self.app.assets.covers[song.path] = pygame.image.load(fallback_cover_path()).convert()
         self.app.active_song = song
         self.app.current_screen = Screen.PLAYING
@@ -81,7 +81,7 @@ class HoldInputRenderingTests(unittest.TestCase):
 
     def _compare_hold_frames(self, actions: dict[int, list[tuple[str, str]]], notes: tuple[Note, ...] | None = None) -> None:
         song = Song("Example", Path("."), (255, 100, 150), Path("song.wav"),
-                    Path("chart.sm"), fallback_cover_path(), 30, "Easy", 2)
+                    Path("chart.sm"), fallback_cover_path(), 30)
         self.app.assets.covers[song.path] = pygame.image.load(fallback_cover_path()).convert()
         session = Session(notes or (Note(1, "left", 3), Note(1, "right", 30)))
         base = views.create_gameplay_base(self.app.screen, self.app.assets, song)

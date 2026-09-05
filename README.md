@@ -126,13 +126,13 @@ Example metadata:
   "artist": "Taylor Swift",
   "audio": "song.wav",
   "chart": "chart.sm",
-  "chart_difficulty": "Beginner"
+  "duration_seconds": 120
 }
 ```
 
 `song.json` is the authoritative application metadata. It includes the displayed
-title, artist, duration, generated WAV filename, source `.sm` filename, selected
-chart difficulty/meter, 256×256 cover filename, and the download URL retained
+title, artist, duration, generated WAV filename, source `.sm` filename,
+256×256 cover filename, and the download URL retained
 from the original `.txt` file. The cover is picked from a downloaded jacket
 image when possible; otherwise a bundled generic cover is used.
 
@@ -149,7 +149,49 @@ python3 scripts/prepare_songs.py ~/pi-dance-songs --dry-run
 python3 scripts/prepare_songs.py ~/pi-dance-songs
 ```
 
-Preparation records the easiest available `dance-single` chart in the metadata.
+To download and prepare songs directly from Zenius-I-vanisher, keep a text file
+outside this repository, for example `~/pi-dance-simfile-ids.txt`, with one ID
+per line. Blank lines, `#` comments, and repeated IDs are allowed:
+
+```text
+# Favourite songs
+49836
+```
+
+Run the importer on your desktop with `ffmpeg`, `ffprobe`, and ImageMagick's
+`magick` installed (the same conversion tools used above):
+
+```bash
+python3 scripts/import_ziv_songs.py ~/pi-dance-simfile-ids.txt ~/pi-dance-songs
+```
+
+Point `[songs] directory` in your game configuration to `~/pi-dance-songs`.
+Each imported song gets a stable `ziv-<id>/` folder containing the original
+files and generated `song.wav`, `song.bmp`, and `song.json`. Metadata includes
+the page's song title and artist, source URL, `ziv_simfile_id`, and
+`ziv_last_updated_by` (the site's updater credit, which is not necessarily the
+chart's original author).
+
+Rerun the same command after adding IDs or after an interrupted import. It
+caches page metadata and ZIPs under `<destination>/.ziv-cache/`, restores missing
+source files from those ZIPs, and reuses the preparation tool to create missing
+runtime files or replace WAVs in the wrong format. Existing metadata edits are
+preserved. Interrupted downloads and conversions are retried on the next run.
+Cached songs require no network requests; removing an ID from the list does not
+delete its song. Existing folders with other names are left alone, so previously
+imported manual bundles are not automatically deduplicated.
+
+The importer supports ZIPs containing one `.sm` file and uses the existing
+converter's easiest `dance-single` selection. SSC-only bundles and bundles with
+multiple `.sm` files are reported as unsupported. A failed song does not stop
+the remaining IDs; the command exits with status 1 if any import failed.
+Both the ID file and destination must be outside this repository. Keep the
+cache to allow offline repairs; delete a song's cache directory to fetch its
+page and ZIP again. Existing source files and metadata still remain intact.
+
+Preparation checks for a usable `dance-single` chart without storing difficulty
+or meter in metadata. Legacy metadata containing those fields remains compatible;
+the game ignores them.
 The game reads all difficulties from the `.sm` file. Songs with multiple charts
 open a stacked-bar selector in the gameplay screen, ordered from Beginner through
 Challenge/Edit (then by meter within each difficulty), with the easiest focused.
