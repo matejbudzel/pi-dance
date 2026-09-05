@@ -14,7 +14,7 @@ from .config import APP_HEIGHT, APP_WIDTH, BACKGROUND, SETTINGS, SONG_DIRECTORY,
 from .gameplay import JudgedNote, Judgement, Session
 from .fbdev import FbdevPresenter
 from .console_input import ConsoleInput
-from .input import Action, actions_from_event
+from .input import Action, Release, actions_from_event
 from .performance import FrameTiming, PerformanceTracker
 from .songs import Song, discover_songs
 from . import views
@@ -58,6 +58,9 @@ class App:
         pygame.mixer.pre_init(MIXER_FREQUENCY, -16, 2, MIXER_BUFFER_SAMPLES)
         pygame.init()
         pygame.display.set_caption(WINDOW_TITLE)
+        self.joysticks = [pygame.joystick.Joystick(index) for index in range(pygame.joystick.get_count())] if SETTINGS.display_backend == "pygame" else []
+        for joystick in self.joysticks:
+            joystick.init()
         if SETTINGS.display_backend == "fbdev":
             pygame.display.set_mode((1, 1))
             self.framebuffer = self._open_framebuffer_presenter()
@@ -154,7 +157,14 @@ class App:
             for action in self.console_input.poll_actions():
                 self._handle_action(action)
 
-    def _handle_action(self, action: Action) -> None:
+    def _handle_action(self, action: Action | Release) -> None:
+        if isinstance(action, Release):
+            if self.session is not None and self.current_screen in (Screen.PLAYING, Screen.PAUSED, Screen.SONG_EXIT_CONFIRMATION):
+                result = self.session.release(ACTION_DIRECTIONS[action.action], self._song_position_seconds())
+                if result is not None:
+                    self._show_feedback(result.judgement)
+                    self._invalidate_modal_snapshot()
+            return
         if action is Action.DEBUG_TOGGLE_PERFORMANCE:
             self.show_performance_hud = not self.show_performance_hud
         elif action in DEBUG_RESULT_STARS and self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING, Screen.PAUSED):

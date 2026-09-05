@@ -221,6 +221,20 @@ def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Sessi
         return
     previous_clip = screen.get_clip()
     screen.set_clip(pygame.Rect(0, HEADER_HEIGHT, APP_WIDTH, APP_HEIGHT - HEADER_HEIGHT))
+    for note, active in _visible_holds(session, song_seconds):
+        rectangle = _hold_rectangle(note, song_seconds, active)
+        colors = ((255, 75, 125), (255, 160, 65), (255, 225, 70), (80, 225, 130), (55, 225, 255), (175, 110, 255))
+        # Anchor dots to the tail so they travel with the chart, not the screen.
+        tail_y = 132 + (note.end_timestamp - song_seconds) * (APP_HEIGHT + 16 - 132) / NOTE_TRAVEL_SECONDS
+        first = max(0, int((tail_y - APP_HEIGHT - 8) // 12))
+        for index in range(first, first + 40):
+            y = round(tail_y - index * 12)
+            if y < rectangle.top:
+                break
+            pygame.draw.circle(screen, colors[index % len(colors)], (rectangle.centerx, y), 4)
+        if active:
+            arrow = assets.flow_arrows[note.direction]
+            screen.blit(arrow, arrow.get_rect(center=(rectangle.centerx, 132)))
     has_visible_note = False
     next_note = None
     for note in session.pending:
@@ -236,7 +250,7 @@ def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Sessi
             arrow = assets.flow_arrows[note.direction]
             screen.blit(arrow, arrow.get_rect(center=(LANE_START_X + lane * LANE_SPACING, round(y))))
             has_visible_note = True
-    if not has_visible_note:
+    if not has_visible_note and not session.active_holds:
         _render_next_note_marker(screen, session, song_seconds, next_note)
     screen.set_clip(previous_clip)
 
@@ -255,6 +269,8 @@ def _gameplay_dynamic_rectangles(assets: Assets, session: Session | None, song_s
     rectangles = [GAMEPLAY_PROGRESS_RECT]
     rectangles.extend(_flowing_note_rectangles(assets, session, song_seconds))
     for index, direction in enumerate(LANE_DIRECTIONS):
+        # Restore receptor edges before drawing their alpha pixels again.
+        rectangles.append(assets.receptors[direction].get_rect(center=(LANE_START_X + index * LANE_SPACING, 132)))
         if now_ms <= glow_until[direction]:
             glow = assets.receptor_glows[direction]
             rectangles.append(glow.get_rect(center=(LANE_START_X + index * LANE_SPACING, 132)))
@@ -269,7 +285,10 @@ def _flowing_note_rectangles(assets: Assets, session: Session | None, song_secon
     if session is None:
         return []
     clip = pygame.Rect(0, HEADER_HEIGHT, APP_WIDTH, APP_HEIGHT - HEADER_HEIGHT)
-    rectangles: list[pygame.Rect] = []
+    rectangles = [_hold_rectangle(note, song_seconds, active).clip(clip) for note, active in _visible_holds(session, song_seconds)]
+    for head in session.active_holds.values():
+        x = LANE_START_X + LANE_DIRECTIONS.index(head.note.direction) * LANE_SPACING
+        rectangles.append(assets.flow_arrows[head.note.direction].get_rect(center=(x, 132)))
     has_visible_note = False
     next_note: Note | None = None
     for note in session.pending:
@@ -293,6 +312,24 @@ def _flowing_note_rectangles(assets: Assets, session: Session | None, song_secon
             center_x = LANE_START_X + LANE_DIRECTIONS.index(next_note.direction) * LANE_SPACING
             rectangles.append(pygame.Rect(center_x - 8, APP_HEIGHT - 22, 16, 16))
     return rectangles
+
+
+def _visible_holds(session: Session, song_seconds: float):
+    for note in session.pending:
+        if note.timestamp - song_seconds > NOTE_TRAVEL_SECONDS:
+            break
+        if note.end_timestamp is not None and note.end_timestamp >= song_seconds:
+            yield note, False
+    for head in session.active_holds.values():
+        yield head.note, True
+
+
+def _hold_rectangle(note: Note, song_seconds: float, active: bool) -> pygame.Rect:
+    speed = (APP_HEIGHT + 16 - 132) / NOTE_TRAVEL_SECONDS
+    x = LANE_START_X + LANE_DIRECTIONS.index(note.direction) * LANE_SPACING
+    top = 132 if active else max(HEADER_HEIGHT, round(132 + (note.timestamp - song_seconds) * speed))
+    bottom = min(APP_HEIGHT + 4, round(132 + (note.end_timestamp - song_seconds) * speed) + 5)
+    return pygame.Rect(x - 5, top, 10, max(0, bottom - top))
 
 
 def _merge_rectangles(rectangles: list[pygame.Rect]) -> list[pygame.Rect]:

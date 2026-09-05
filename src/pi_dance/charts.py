@@ -1,4 +1,4 @@
-"""Small StepMania .sm parser for the MVP's dance-single tap charts."""
+"""Small StepMania .sm parser for dance-single taps and holds."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ DIFFICULTY_ORDER = {"beginner": 0, "easy": 1, "medium": 2, "hard": 3, "challenge
 class Note:
     timestamp: float
     direction: str
+    end_timestamp: float | None = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,7 @@ def _parse_chart(notes_block: str, bpm_changes: tuple[tuple[float, float], ...],
         raise ValueError(f"invalid chart meter: {fields[3]!r}") from error
 
     notes: list[Note] = []
+    holds: dict[int, int] = {}
     measures = fields[5].split(",")
     for measure_index, measure in enumerate(measures):
         rows = _note_rows(measure)
@@ -92,8 +94,15 @@ def _parse_chart(notes_block: str, bpm_changes: tuple[tuple[float, float], ...],
             beat = measure_index * 4 + row_index * 4 / len(rows)
             timestamp = _seconds_at_beat(beat, bpm_changes) + offset
             for panel, value in enumerate(row):
-                if value == "1":
+                if value in "1L":
                     notes.append(Note(timestamp=timestamp, direction=PANEL_DIRECTIONS[panel]))
+                elif value == "2":
+                    holds[panel] = len(notes)
+                    notes.append(Note(timestamp=timestamp, direction=PANEL_DIRECTIONS[panel]))
+                elif value == "3" and panel in holds:
+                    index = holds.pop(panel)
+                    head = notes[index]
+                    notes[index] = Note(head.timestamp, head.direction, timestamp)
     return Chart(difficulty=fields[2].strip(), meter=meter, notes=tuple(notes))
 
 

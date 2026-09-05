@@ -5,6 +5,32 @@ from pi_dance.gameplay import Judgement, Session
 
 
 class SessionTests(unittest.TestCase):
+    def test_hold_scores_once_at_tail_with_immediate_head_feedback(self) -> None:
+        session = Session((Note(1, "left", 3),))
+        self.assertIs(session.press("left", 1).judgement, Judgement.GREAT)
+        self.assertEqual(session.judgements, [])
+        self.assertEqual(session.expire(2), [])
+        self.assertIs(session.expire(3)[0].judgement, Judgement.GREAT)
+        self.assertEqual(len(session.judgements), 1)
+        self.assertIsNone(session.release("left", 3.1))
+
+    def test_early_release_misses_but_small_tail_tolerance_is_allowed(self) -> None:
+        for release, expected in ((2, Judgement.MISS), (2.9, Judgement.GREAT)):
+            session = Session((Note(1, "left", 3),))
+            session.press("left", 1)
+            self.assertIs(session.release("left", release).judgement, expected)
+            self.assertEqual(session.expire(4), [])
+            self.assertEqual(len(session.judgements), 1)
+
+    def test_hold_does_not_block_other_lane_or_repeat_score(self) -> None:
+        session = Session((Note(1, "left", 3), Note(2, "right")))
+        session.press("left", 1)
+        self.assertIsNone(session.press("left", 1.5))
+        self.assertTrue(session.last_press_was_ignored)
+        self.assertIs(session.press("right", 2).judgement, Judgement.GREAT)
+        session.expire(3)
+        self.assertEqual(session.stars(), 5)
+
     def test_judges_directional_notes_using_audio_time(self) -> None:
         session = Session((Note(1.0, "left"), Note(1.2, "right")))
 

@@ -34,8 +34,12 @@ class Session:
         self.judgements: list[JudgedNote] = []
         self.last_press_was_ignored = False
         self._last_successful_press: tuple[float, Note] | None = None
+        self.active_holds: dict[str, JudgedNote] = {}
 
     def press(self, direction: str, song_time: float) -> JudgedNote | None:
+        if direction in self.active_holds:
+            self.last_press_was_ignored = True
+            return None
         self.last_press_was_ignored = self._is_accidental_double_tap(song_time)
         if self.last_press_was_ignored:
             return None
@@ -50,8 +54,20 @@ class Session:
         self.pending.remove(note)
         judgement = Judgement.GREAT if abs(note.timestamp - song_time) <= GREAT_WINDOW_SECONDS else Judgement.OK
         result = JudgedNote(note=note, judgement=judgement)
-        self.judgements.append(result)
+        if note.end_timestamp is not None:
+            self.active_holds[direction] = result
+        else:
+            self.judgements.append(result)
         self._last_successful_press = (song_time, note)
+        return result
+
+    def release(self, direction: str, song_time: float) -> JudgedNote | None:
+        head = self.active_holds.pop(direction, None)
+        if head is None:
+            return None
+        judgement = head.judgement if song_time >= head.note.end_timestamp - GREAT_WINDOW_SECONDS else Judgement.MISS
+        result = JudgedNote(head.note, judgement)
+        self.judgements.append(result)
         return result
 
     def _is_accidental_double_tap(self, song_time: float) -> bool:
@@ -65,6 +81,10 @@ class Session:
 
     def expire(self, song_time: float) -> list[JudgedNote]:
         expired: list[JudgedNote] = []
+        for direction, head in list(self.active_holds.items()):
+            if song_time >= head.note.end_timestamp:
+                result = self.release(direction, song_time)
+                expired.append(result)
         while self.pending and self.pending[0].timestamp < song_time - OK_WINDOW_SECONDS:
             note = self.pending.pop(0)
             result = JudgedNote(note=note, judgement=Judgement.MISS)

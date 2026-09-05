@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum, auto
+from dataclasses import dataclass
 
 import pygame
 
@@ -37,9 +38,26 @@ KEY_ACTIONS = {
 }
 
 
-def actions_from_event(event: pygame.event.Event) -> list[Action]:
-    if event.type != pygame.KEYDOWN:
-        return []
+@dataclass(frozen=True)
+class Release:
+    action: Action
 
-    action = KEY_ACTIONS.get(event.key)
+
+PAD_ACTIONS = {0: Action.LEFT, 1: Action.DOWN, 2: Action.UP, 3: Action.RIGHT, 8: Action.START, 9: Action.SELECT}
+DIRECTIONS = {Action.LEFT, Action.RIGHT, Action.UP, Action.DOWN}
+
+
+def actions_from_event(event: pygame.event.Event) -> list[Action | Release]:
+    if event.type in (pygame.JOYBUTTONDOWN, pygame.JOYBUTTONUP):
+        action = PAD_ACTIONS.get(event.button)
+        released = event.type == pygame.JOYBUTTONUP
+    elif event.type in (pygame.KEYDOWN, pygame.KEYUP):
+        if event.type == pygame.KEYDOWN and getattr(event, "repeat", False):
+            return []
+        action = KEY_ACTIONS.get(event.key)
+        released = event.type == pygame.KEYUP
+    else:
+        return []
+    if released:
+        return [Release(action)] if action in DIRECTIONS else []
     return [action] if action is not None else []

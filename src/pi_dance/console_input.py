@@ -13,7 +13,7 @@ import time
 import tty
 from pathlib import Path
 
-from .input import Action
+from .input import Action, DIRECTIONS, PAD_ACTIONS, Release
 
 
 KDSETMODE = 0x4B3A
@@ -26,14 +26,6 @@ JSIOCGBUTTONS = 0x80016A12
 PAD_DEVICE_NAME = "WiseGroup.,Ltd X-PAD, Extreme Dance Pad"
 INPUT_STATUS_PATH = Path("/tmp/pi-dance-input.txt")
 
-PAD_ACTIONS = {
-    0: Action.LEFT,
-    1: Action.DOWN,
-    2: Action.UP,
-    3: Action.RIGHT,
-    8: Action.START,
-    9: Action.SELECT,
-}
 KEY_SEQUENCES = {
     b"\x1b[A": Action.UP,
     b"\x1bOA": Action.UP,
@@ -92,8 +84,8 @@ class ConsoleInput:
         sys.stdout.write("\x1bc")
         sys.stdout.flush()
 
-    def poll_actions(self) -> list[Action]:
-        actions = self._read_keyboard_actions()
+    def poll_actions(self) -> list[Action | Release]:
+        actions: list[Action | Release] = list(self._read_keyboard_actions())
         if not self._joysticks and time.monotonic() >= self._next_joystick_retry:
             self._joysticks, self._input_status = self._open_joysticks()
             self._next_joystick_retry = time.monotonic() + 2.0
@@ -105,9 +97,13 @@ class ConsoleInput:
                 continue
             for offset in range(0, len(data) - JS_EVENT.size + 1, JS_EVENT.size):
                 _, value, event_type, button = JS_EVENT.unpack_from(data, offset)
-                if event_type & 0x7F == 1 and value == 1 and button in PAD_ACTIONS:
-                    self._button_events.append(f"button {button} -> {PAD_ACTIONS[button].name}")
-                    actions.append(PAD_ACTIONS[button])
+                if event_type & 0x7F == 1 and button in PAD_ACTIONS:
+                    action = PAD_ACTIONS[button]
+                    if value == 1:
+                        self._button_events.append(f"button {button} -> {action.name}")
+                        actions.append(action)
+                    elif action in DIRECTIONS:
+                        actions.append(Release(action))
         return actions
 
     def _read_keyboard_actions(self) -> list[Action]:

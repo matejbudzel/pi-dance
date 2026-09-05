@@ -167,14 +167,18 @@ The chart loader should translate source files into a small internal representat
 Initial scope:
 
 - four-panel single-player dance
-- tap notes
+- tap and hold notes (lifts simplified to taps)
 - BPM and song offset
 - Beginner/Easy community charts
 
 More advanced features such as mines, rolls, complex gimmicks and full `.sm`/`.ssc` compatibility are non-goals until real songs require them.
-All difficulties currently play only their tap notes, including simultaneous taps.
-Hold/roll heads and tails, mines, lifts and other non-tap symbols are ignored;
-harder charts therefore play as simplified tap-only versions.
+All difficulties support taps and holds. Holds have rainbow-dot tails matching
+their duration; press the arrow and keep the panel down until the tail ends.
+The head gives immediate feedback, and each hold scores once on completion or
+early release, with 130 ms of tolerance at the tail. Lifts become ordinary taps.
+Mines, rolls and other non-tap symbols remain ignored.
+Desktop keyboards and dance-pad buttons report releases. The legacy framebuffer
+TTY keyboard cannot report releases, so its holds complete after the initial tap.
 
 ## Timing and scoring
 
