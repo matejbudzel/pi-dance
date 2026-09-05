@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 PANEL_DIRECTIONS = ("left", "down", "up", "right")
+DIFFICULTY_ORDER = {"beginner": 0, "easy": 1, "medium": 2, "hard": 3, "challenge": 4, "edit": 5}
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,10 @@ class Chart:
 class SongCharts:
     offset: float
     charts: tuple[Chart, ...]
+
+
+def difficulty_key(chart: Chart) -> tuple[int, int]:
+    return DIFFICULTY_ORDER.get(chart.difficulty.casefold(), 99), chart.meter
 
 
 def load_sm(path: Path) -> SongCharts:

@@ -98,6 +98,33 @@ def render_gameplay_base(screen: pygame.Surface, assets: Assets, song: Song) -> 
         screen.blit(receptor, receptor.get_rect(center=center))
 
 
+def render_difficulty_selection(screen: pygame.Surface, assets: Assets, song: Song | None, count: int, selected: int) -> None:
+    if song is None or count == 0:
+        return
+    _render_gameplay_header_static(screen, assets, song)
+    screen.blit(assets.cover_for(song), GAMEPLAY_COVER_POSITION)
+    # A sliding row keeps even files with many edit charts readable.
+    visible = min(count, 6)
+    first = max(0, min(selected - visible // 2, count - visible))
+    left, width = 300, APP_WIDTH - 320
+    spacing = min(84, width // visible)
+    start_x = left + (width - spacing * (visible - 1)) // 2
+    for slot, index in enumerate(range(first, first + visible)):
+        x = start_x + slot * spacing
+        color = song.focus_color if index == selected else (145, 145, 155)
+        bars = index + 1
+        bar_step = min(10, 72 / bars)
+        for bar in range(bars):
+            y = round(162 - bar * bar_step)
+            pygame.draw.rect(screen, color, (x - 20, y, 40, max(1, round(bar_step * 0.65))))
+        if index == selected:
+            pygame.draw.lines(screen, color, False, [(x - 10, 192), (x, 182), (x + 10, 192)], 4)
+    if first > 0:
+        pygame.draw.polygon(screen, FOREGROUND, [(left - 12, 136), (left - 4, 130), (left - 4, 142)])
+    if first + visible < count:
+        pygame.draw.polygon(screen, FOREGROUND, [(APP_WIDTH - 8, 136), (APP_WIDTH - 16, 130), (APP_WIDTH - 16, 142)])
+
+
 def render_cached_gameplay(screen: pygame.Surface, base: pygame.Surface, assets: Assets, song: Song, session: Session | None, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int, countdown: int | None, previous_rectangles: list[pygame.Rect]) -> tuple[list[pygame.Rect], list[pygame.Rect]]:
     """Restore only former/current moving artwork, then paint live gameplay."""
     current_rectangles = _gameplay_dynamic_rectangles(assets, session, song_seconds, feedback, feedback_until, glow_until, now_ms, countdown)

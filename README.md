@@ -149,9 +149,14 @@ python3 scripts/prepare_songs.py ~/pi-dance-songs --dry-run
 python3 scripts/prepare_songs.py ~/pi-dance-songs
 ```
 
-It chooses the easiest available `dance-single` chart entry in each `.sm` file.
-The future chart loader should still expose every available chart; the MVP song
-list simply uses the choice recorded in the metadata.
+Preparation records the easiest available `dance-single` chart in the metadata.
+The game reads all difficulties from the `.sm` file. Songs with multiple charts
+open a stacked-bar selector in the gameplay screen, ordered from Beginner through
+Challenge/Edit (then by meter within each difficulty), with the easiest focused.
+More bars mean a later option in this song's difficulty order, not an absolute meter.
+Left/Right moves focus, START confirms and begins the countdown, and SELECT opens
+the same song-exit confirmation used during play. Cancelling preserves focus.
+Songs with one chart go straight to the countdown.
 
 ## Chart philosophy
 
@@ -167,6 +172,9 @@ Initial scope:
 - Beginner/Easy community charts
 
 More advanced features such as mines, rolls, complex gimmicks and full `.sm`/`.ssc` compatibility are non-goals until real songs require them.
+All difficulties currently play only their tap notes, including simultaneous taps.
+Hold/roll heads and tails, mines, lifts and other non-tap symbols are ignored;
+harder charts therefore play as simplified tap-only versions.
 
 ## Timing and scoring
 
@@ -182,7 +190,6 @@ Global audio/input timing offsets should be configurable so HDMI/display/input l
 
 - persistent high scores
 - user profiles
-- difficulty selection UI
 - multiplayer
 - combo multipliers
 - life/fail mechanics

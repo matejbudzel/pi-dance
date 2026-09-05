@@ -9,7 +9,7 @@ from pathlib import Path
 import pygame
 
 from .assets import Assets
-from .charts import Chart, load_sm
+from .charts import Chart, difficulty_key, load_sm
 from .config import APP_HEIGHT, APP_WIDTH, BACKGROUND, SETTINGS, SONG_DIRECTORY, TARGET_FPS, WINDOW_TITLE
 from .gameplay import JudgedNote, Judgement, Session
 from .fbdev import FbdevPresenter
@@ -24,6 +24,7 @@ class Screen(Enum):
     SPLASH = auto()
     SONG_LIST = auto()
     EXIT_CONFIRMATION = auto()
+    DIFFICULTY = auto()
     COUNTDOWN = auto()
     PLAYING = auto()
     PAUSED = auto()
@@ -77,6 +78,8 @@ class App:
         self.countdown_remaining_on_modal = 0
         self.active_song: Song | None = None
         self.active_chart: Chart | None = None
+        self.available_charts: tuple[Chart, ...] = ()
+        self.selected_difficulty = 0
         self.session: Session | None = None
         self.feedback: Judgement | None = None
         self.feedback_until = 0.0
@@ -162,6 +165,12 @@ class App:
             self.current_screen = Screen.SONG_LIST
         elif self.current_screen is Screen.SONG_LIST:
             self._handle_song_list_action(action)
+        elif self.current_screen is Screen.DIFFICULTY:
+            if action in (Action.LEFT, Action.RIGHT):
+                step = -1 if action is Action.LEFT else 1
+                self.selected_difficulty = (self.selected_difficulty + step) % len(self.available_charts)
+            elif action is Action.START:
+                self._start_chart()
         elif self.current_screen is Screen.EXIT_CONFIRMATION:
             self._handle_application_exit_action(action)
         elif self.current_screen is Screen.PLAYING and action is Action.START:
@@ -190,7 +199,7 @@ class App:
         elif self.current_screen is Screen.RESULT:
             self._stop_song()
             self.current_screen = Screen.SONG_LIST
-        elif self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING, Screen.PAUSED):
+        elif self.current_screen in (Screen.DIFFICULTY, Screen.COUNTDOWN, Screen.PLAYING, Screen.PAUSED):
             self.song_exit_return_screen = self.current_screen
             if self.current_screen is Screen.COUNTDOWN:
                 self.countdown_remaining_on_modal = self._countdown_remaining()
@@ -244,18 +253,33 @@ class App:
     def _prepare_song(self, song: Song) -> None:
         try:
             parsed = load_sm(song.chart_path)
-            self.active_chart = next(chart for chart in parsed.charts if chart.difficulty == song.chart_difficulty and chart.meter == song.chart_meter)
+            charts = tuple(sorted(parsed.charts, key=difficulty_key))
+            if not charts:
+                return
             pygame.mixer.music.load(str(song.audio_path))
-        except (OSError, pygame.error, StopIteration, ValueError):
+        except (OSError, pygame.error, ValueError):
             return
         self.active_song = song
+        self.available_charts = charts
+        self.selected_difficulty = 0
+        self.active_chart = None
+        self.session = None
         self.gameplay_base = None
         self.gameplay_base_song = None
         self.gameplay_needs_full_restore = False
         self.gameplay_dynamic_rectangles = []
-        self.session = Session(self.active_chart.notes)
         self.feedback = None
         self.playback_started = False
+        self.receptor_glow_until = {direction: 0 for direction in ACTION_DIRECTIONS.values()}
+        self._invalidate_modal_snapshot()
+        if len(charts) > 1:
+            self.current_screen = Screen.DIFFICULTY
+        else:
+            self._start_chart()
+
+    def _start_chart(self) -> None:
+        self.active_chart = self.available_charts[self.selected_difficulty]
+        self.session = Session(self.active_chart.notes)
         self.countdown_started_at = pygame.time.get_ticks()
         self.current_screen = Screen.COUNTDOWN
 
@@ -291,6 +315,8 @@ class App:
         pygame.mixer.music.stop()
         self.active_song = None
         self.active_chart = None
+        self.available_charts = ()
+        self.selected_difficulty = 0
         self.session = None
         self.feedback = None
         self.playback_started = False
@@ -299,6 +325,7 @@ class App:
         self.gameplay_base_song = None
         self.gameplay_dynamic_rectangles = []
         self.gameplay_present_rectangles = []
+        self._invalidate_modal_snapshot()
 
     def _show_debug_result(self, stars: int) -> None:
         pygame.mixer.music.stop()
@@ -314,7 +341,11 @@ class App:
                 views.render_performance_hud(self.screen, self.assets, self.performance.latest)
             return
 
-        cached_gameplay = self.framebuffer is not None and self.current_screen in (
+        difficulty_screen = self.current_screen is Screen.DIFFICULTY or (
+            self.current_screen is Screen.SONG_EXIT_CONFIRMATION
+            and self.song_exit_return_screen is Screen.DIFFICULTY
+        )
+        cached_gameplay = not difficulty_screen and self.framebuffer is not None and self.current_screen in (
             Screen.COUNTDOWN,
             Screen.PLAYING,
             Screen.PAUSED,
@@ -331,6 +362,10 @@ class App:
             views.render_application_exit_confirmation(self.screen, self.assets, self.exit_confirmation_selected)
         elif self.current_screen is Screen.RESULT:
             views.render_result(self.screen, self.assets, self.active_song, self._audio_position_seconds(), self.result_stars, self.result_started_at, now_ms)
+        elif difficulty_screen:
+            views.render_difficulty_selection(self.screen, self.assets, self.active_song, len(self.available_charts), self.selected_difficulty)
+            if self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
+                views.render_song_exit_confirmation(self.screen, self.assets, self.song_exit_confirmation_selected)
         else:
             countdown = self._countdown_remaining() if self.current_screen is Screen.COUNTDOWN else None
             if cached_gameplay and self.active_song is not None:
@@ -363,6 +398,7 @@ class App:
         signature = (
             self.current_screen,
             self.selected,
+            self.selected_difficulty,
             self.first_visible_row,
             self.exit_confirmation_selected,
             self.song_exit_confirmation_selected,
