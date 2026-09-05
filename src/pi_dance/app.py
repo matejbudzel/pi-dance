@@ -87,6 +87,7 @@ class App:
         self.countdown_started_at = 0
         self.show_performance_hud = False
         self.performance = PerformanceTracker()
+        self.modal_snapshot: pygame.Surface | None = None
 
     def run(self) -> None:
         console_input = ConsoleInput() if self.framebuffer is not None else None
@@ -160,11 +161,13 @@ class App:
         elif self.current_screen is Screen.PLAYING and action is Action.START:
             pygame.mixer.music.pause()
             self.current_screen = Screen.PAUSED
+            self.modal_snapshot = None
         elif self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING) and action in ACTION_DIRECTIONS:
             self._handle_direction(ACTION_DIRECTIONS[action])
         elif self.current_screen is Screen.PAUSED and action is Action.START:
             pygame.mixer.music.unpause()
             self.current_screen = Screen.PLAYING
+            self.modal_snapshot = None
         elif self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
             self._handle_song_exit_action(action)
         elif self.current_screen is Screen.RESULT and action is Action.START:
@@ -189,6 +192,7 @@ class App:
                 pygame.mixer.music.pause()
             self.song_exit_confirmation_selected = False
             self.current_screen = Screen.SONG_EXIT_CONFIRMATION
+            self.modal_snapshot = None
 
     def _handle_song_list_action(self, action: Action) -> None:
         if action is Action.UP:
@@ -215,6 +219,7 @@ class App:
     def _handle_song_exit_action(self, action: Action) -> None:
         if action in (Action.LEFT, Action.RIGHT, Action.UP, Action.DOWN):
             self.song_exit_confirmation_selected = not self.song_exit_confirmation_selected
+            self.modal_snapshot = None
         elif action is Action.START:
             if self.song_exit_confirmation_selected:
                 self._stop_song()
@@ -281,6 +286,13 @@ class App:
         self.current_screen = Screen.RESULT
 
     def _render(self) -> None:
+        modal_screen = self.current_screen in (Screen.PAUSED, Screen.SONG_EXIT_CONFIRMATION)
+        if modal_screen and self.modal_snapshot is not None:
+            self.screen.blit(self.modal_snapshot, (0, 0))
+            if self.show_performance_hud:
+                views.render_performance_hud(self.screen, self.assets, self.performance.latest)
+            return
+
         self.screen.fill(BACKGROUND)
         now_ms = pygame.time.get_ticks()
         if self.current_screen is Screen.SPLASH:
@@ -299,6 +311,8 @@ class App:
                 views.render_modal(self.screen, self.assets, SETTINGS.pause_text)
             elif self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
                 views.render_song_exit_confirmation(self.screen, self.assets, self.song_exit_confirmation_selected)
+        if modal_screen:
+            self.modal_snapshot = self.screen.copy()
         if self.show_performance_hud:
             views.render_performance_hud(self.screen, self.assets, self.performance.latest)
 

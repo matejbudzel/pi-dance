@@ -76,6 +76,7 @@ class FbdevPresenter:
             self._line_length = fixed.line_length
             self._bytes_per_pixel = variable.bits_per_pixel // 8
             self._map = mmap.mmap(self._descriptor, fixed.smem_len, access=mmap.ACCESS_WRITE)
+            self._map_address = ctypes.addressof(ctypes.c_char.from_buffer(self._map))
             self._framebuffer_offset = variable.yoffset * fixed.line_length + variable.xoffset * self._bytes_per_pixel
             self._masks = (_bitmask(variable.red), _bitmask(variable.green), _bitmask(variable.blue), _bitmask(variable.transp))
             self._surface = pygame.Surface((variable.xres, variable.yres), depth=16, masks=self._masks)
@@ -108,14 +109,15 @@ class FbdevPresenter:
             del self._descriptor
 
     def _copy_rows(self, surface: pygame.Surface, rectangle: pygame.Rect) -> None:
-        pixels = bytes(surface.get_view("0"))
+        pixels = surface.get_view("0")
+        source_address = ctypes.addressof(ctypes.c_char.from_buffer(pixels))
         source_pitch = surface.get_pitch()
         if rectangle == surface.get_rect() and source_pitch == self._line_length:
             byte_count = source_pitch * rectangle.height
-            self._map[self._framebuffer_offset:self._framebuffer_offset + byte_count] = pixels[:byte_count]
+            ctypes.memmove(self._map_address + self._framebuffer_offset, source_address, byte_count)
             return
         row_width = rectangle.width * self._bytes_per_pixel
         for row in range(rectangle.height):
             source_start = (rectangle.y + row) * source_pitch + rectangle.x * self._bytes_per_pixel
             target_start = self._framebuffer_offset + (rectangle.y + row) * self._line_length + rectangle.x * self._bytes_per_pixel
-            self._map[target_start:target_start + row_width] = pixels[source_start:source_start + row_width]
+            ctypes.memmove(self._map_address + target_start, source_address + source_start, row_width)
