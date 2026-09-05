@@ -167,18 +167,32 @@ The chart loader should translate source files into a small internal representat
 Initial scope:
 
 - four-panel single-player dance
-- tap and hold notes (lifts simplified to taps)
+- tap, hold and lift notes
 - BPM and song offset
 - Beginner/Easy community charts
 
 More advanced features such as mines, rolls, complex gimmicks and full `.sm`/`.ssc` compatibility are non-goals until real songs require them.
-All difficulties support taps and holds. Holds have rainbow-dot tails matching
+All difficulties support taps, holds and lifts. Holds have rainbow-dot tails matching
 their duration; press the arrow and keep the panel down until the tail ends.
-The head gives immediate feedback, and each hold scores once on completion or
-early release, with 130 ms of tolerance at the tail. Lifts become ordinary taps.
+The head gives immediate feedback. Missing it leaves the tail flowing so a late
+press can still earn credit. Releasing and pressing again accumulates the time
+actually held. Lifts reverse the visual: rainbow dots arrive first and the arrow
+marks when to release the panel. Since SM's `L` stores only a release timestamp,
+the game supplies a one-beat lead-in, shortened to avoid the previous note on
+the same panel. Lead-ins follow BPM changes.
+
+Holds and lifts each score once: 70% comes from the important edge (press for
+holds, release for lifts), and 30% from the proportion of the interval held.
+Edge timing within 130 ms earns full edge credit; within 280 ms earns half.
+An accurately hit edge also forgives up to 130 ms of uncovered interval.
+Early starts, late ends and interrupted presses count only their intersection
+with the interval. Holding through a lift without releasing earns overlap credit
+only. No overlap and no correctly timed hold press earns no credit.
 Mines, rolls and other non-tap symbols remain ignored.
 Desktop keyboards and dance-pad buttons report releases. The legacy framebuffer
-TTY keyboard cannot report releases, so its holds complete after the initial tap.
+TTY keyboard cannot report releases: it cannot judge lift edges and treats a
+pressed panel as held for interval credit. Use the pad or desktop keyboard for
+the full hold/lift interaction.
 
 ## Timing and scoring
 

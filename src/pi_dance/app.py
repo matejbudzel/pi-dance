@@ -383,13 +383,14 @@ class App:
                     self.gameplay_base = views.create_gameplay_base(self.screen, self.assets, self.active_song)
                     self.gameplay_base_song = self.active_song
                     self.gameplay_needs_full_restore = True
-                if self.gameplay_needs_full_restore:
+                full_restore = self.gameplay_needs_full_restore
+                if full_restore:
                     self.screen.blit(self.gameplay_base, (0, 0))
                     self.gameplay_needs_full_restore = False
                     self.gameplay_dynamic_rectangles = []
                     self.gameplay_present_rectangles = [pygame.Rect(0, 0, APP_WIDTH, APP_HEIGHT)]
                 self.gameplay_dynamic_rectangles, restored_rectangles = views.render_cached_gameplay(self.screen, self.gameplay_base, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms, countdown, self.gameplay_dynamic_rectangles)
-                if restored_rectangles:
+                if restored_rectangles and not full_restore:
                     self.gameplay_present_rectangles = restored_rectangles
             else:
                 views.render_gameplay(self.screen, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms)

@@ -236,14 +236,16 @@ def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Sessi
             arrow = assets.flow_arrows[note.direction]
             screen.blit(arrow, arrow.get_rect(center=(rectangle.centerx, 132)))
     has_visible_note = False
-    next_note = None
     for note in session.pending:
-        seconds_until_note = note.timestamp - song_seconds
+        if note.direction in session.active_holds and session.active_holds[note.direction].note == note:
+            continue
+        if note.timestamp - song_seconds > NOTE_TRAVEL_SECONDS:
+            break
+        seconds_until_note = note.arrow_timestamp - song_seconds
         if seconds_until_note < -0.25:
             continue
         if seconds_until_note > NOTE_TRAVEL_SECONDS:
-            next_note = note
-            break
+            continue
         lane = LANE_DIRECTIONS.index(note.direction)
         y = 132 + seconds_until_note * (APP_HEIGHT + 16 - 132) / NOTE_TRAVEL_SECONDS
         if HEADER_HEIGHT <= y <= APP_HEIGHT + 16:
@@ -251,13 +253,13 @@ def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Sessi
             screen.blit(arrow, arrow.get_rect(center=(LANE_START_X + lane * LANE_SPACING, round(y))))
             has_visible_note = True
     if not has_visible_note and not session.active_holds:
-        _render_next_note_marker(screen, session, song_seconds, next_note)
+        _render_next_note_marker(screen, session, song_seconds)
     screen.set_clip(previous_clip)
 
 
 def _render_next_note_marker(screen: pygame.Surface, session: Session, song_seconds: float, next_note: Note | None = None) -> None:
     if next_note is None:
-        next_note = next((note for note in session.pending if note.timestamp > song_seconds), None)
+        next_note = min((note for note in session.pending if note.arrow_timestamp > song_seconds), key=lambda note: note.arrow_timestamp, default=None)
     if next_note is None:
         return
     center_x = LANE_START_X + LANE_DIRECTIONS.index(next_note.direction) * LANE_SPACING
@@ -285,19 +287,22 @@ def _flowing_note_rectangles(assets: Assets, session: Session | None, song_secon
     if session is None:
         return []
     clip = pygame.Rect(0, HEADER_HEIGHT, APP_WIDTH, APP_HEIGHT - HEADER_HEIGHT)
-    rectangles = [_hold_rectangle(note, song_seconds, active).clip(clip) for note, active in _visible_holds(session, song_seconds)]
+    rectangles = [_hold_rectangle(note, song_seconds, active).inflate(0, 8).clip(clip) for note, active in _visible_holds(session, song_seconds)]
     for head in session.active_holds.values():
         x = LANE_START_X + LANE_DIRECTIONS.index(head.note.direction) * LANE_SPACING
         rectangles.append(assets.flow_arrows[head.note.direction].get_rect(center=(x, 132)))
     has_visible_note = False
     next_note: Note | None = None
     for note in session.pending:
-        seconds_until_note = note.timestamp - song_seconds
+        if note.direction in session.active_holds and session.active_holds[note.direction].note == note:
+            continue
+        if note.timestamp - song_seconds > NOTE_TRAVEL_SECONDS:
+            break
+        seconds_until_note = note.arrow_timestamp - song_seconds
         if seconds_until_note < -0.25:
             continue
         if seconds_until_note > NOTE_TRAVEL_SECONDS:
-            next_note = note
-            break
+            continue
         lane = LANE_DIRECTIONS.index(note.direction)
         y = 132 + seconds_until_note * (APP_HEIGHT + 16 - 132) / NOTE_TRAVEL_SECONDS
         arrow = assets.flow_arrows[note.direction]
@@ -307,7 +312,7 @@ def _flowing_note_rectangles(assets: Assets, session: Session | None, song_secon
             has_visible_note = True
     if not has_visible_note:
         if next_note is None:
-            next_note = next((note for note in session.pending if note.timestamp > song_seconds), None)
+            next_note = min((note for note in session.pending if note.arrow_timestamp > song_seconds), key=lambda note: note.arrow_timestamp, default=None)
         if next_note is not None:
             center_x = LANE_START_X + LANE_DIRECTIONS.index(next_note.direction) * LANE_SPACING
             rectangles.append(pygame.Rect(center_x - 8, APP_HEIGHT - 22, 16, 16))
@@ -319,9 +324,8 @@ def _visible_holds(session: Session, song_seconds: float):
         if note.timestamp - song_seconds > NOTE_TRAVEL_SECONDS:
             break
         if note.end_timestamp is not None and note.end_timestamp >= song_seconds:
-            yield note, False
-    for head in session.active_holds.values():
-        yield head.note, True
+            active = note.direction in session.active_holds and session.active_holds[note.direction].note == note
+            yield note, active
 
 
 def _hold_rectangle(note: Note, song_seconds: float, active: bool) -> pygame.Rect:

@@ -14,13 +14,52 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(len(session.judgements), 1)
         self.assertIsNone(session.release("left", 3.1))
 
-    def test_early_release_misses_but_small_tail_tolerance_is_allowed(self) -> None:
-        for release, expected in ((2, Judgement.MISS), (2.9, Judgement.GREAT)):
+    def test_early_release_earns_partial_credit_and_tail_tolerance_is_allowed(self) -> None:
+        for release, expected, credit in ((2, Judgement.OK, 0.85), (2.9, Judgement.GREAT, 1)):
             session = Session((Note(1, "left", 3),))
             session.press("left", 1)
             self.assertIs(session.release("left", release).judgement, expected)
-            self.assertEqual(session.expire(4), [])
+            session.expire(4)
             self.assertEqual(len(session.judgements), 1)
+            self.assertEqual(session.judgements[0].credit, credit)
+
+    def test_missed_head_remains_available_for_late_partial_hold(self) -> None:
+        note = Note(1, "left", 5)
+        session = Session((note,))
+        self.assertEqual(session.expire(2), [])
+        self.assertEqual(session.pending, [note])
+        self.assertIs(session.press("left", 3).judgement, Judgement.OK)
+        result = session.expire(5)[0]
+        self.assertAlmostEqual(result.credit, 0.15)
+        self.assertEqual(session.stars(), 2)
+
+    def test_regrabbing_accumulates_only_time_actually_held(self) -> None:
+        session = Session((Note(1, "left", 5),))
+        session.press("left", 1)
+        session.release("left", 2)
+        self.assertEqual(session.judgements, [])
+        session.press("left", 3)
+        self.assertAlmostEqual(session.expire(5)[0].credit, 0.925)
+        self.assertEqual(len(session.judgements), 1)
+        self.assertEqual(session.stars(), 5)
+
+    def test_unplayed_hold_expires_at_tail_without_blocking_tap_misses(self) -> None:
+        hold, tap = Note(1, "left", 5), Note(2, "right")
+        session = Session((hold, tap))
+        self.assertEqual([result.note for result in session.expire(3)], [tap])
+        self.assertEqual(session.pending, [hold])
+        self.assertIs(session.expire(5)[0].judgement, Judgement.MISS)
+        self.assertEqual(session.expire(6), [])
+        self.assertIsNone(session.press("left", 6))
+
+    def test_short_late_hold_gets_less_credit_than_long_late_hold(self) -> None:
+        credits = []
+        for start in (2, 3, 4.5):
+            session = Session((Note(1, "left", 5),))
+            session.press("left", start)
+            credits.append(session.expire(5)[0].credit)
+        for actual, expected in zip(credits, [0.225, 0.15, 0.0375]):
+            self.assertAlmostEqual(actual, expected)
 
     def test_hold_does_not_block_other_lane_or_repeat_score(self) -> None:
         session = Session((Note(1, "left", 3), Note(2, "right")))

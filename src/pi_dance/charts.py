@@ -1,4 +1,4 @@
-"""Small StepMania .sm parser for dance-single taps and holds."""
+"""Small StepMania .sm parser for dance-single taps, holds and lifts."""
 
 from __future__ import annotations
 
@@ -16,6 +16,11 @@ class Note:
     timestamp: float
     direction: str
     end_timestamp: float | None = None
+    is_lift: bool = False
+
+    @property
+    def arrow_timestamp(self) -> float:
+        return self.end_timestamp if self.is_lift else self.timestamp
 
 
 @dataclass(frozen=True)
@@ -94,8 +99,15 @@ def _parse_chart(notes_block: str, bpm_changes: tuple[tuple[float, float], ...],
             beat = measure_index * 4 + row_index * 4 / len(rows)
             timestamp = _seconds_at_beat(beat, bpm_changes) + offset
             for panel, value in enumerate(row):
-                if value in "1L":
+                if value == "1":
                     notes.append(Note(timestamp=timestamp, direction=PANEL_DIRECTIONS[panel]))
+                elif value == "L":
+                    # SM stores only the release edge. Supply a one-beat lead-in.
+                    start = _seconds_at_beat(beat - 1, bpm_changes) + offset
+                    previous = next((note for note in reversed(notes) if note.direction == PANEL_DIRECTIONS[panel]), None)
+                    if previous is not None:
+                        start = max(start, previous.end_timestamp if previous.end_timestamp is not None else previous.timestamp)
+                    notes.append(Note(min(start, timestamp - 0.001), PANEL_DIRECTIONS[panel], timestamp, is_lift=True))
                 elif value == "2":
                     holds[panel] = len(notes)
                     notes.append(Note(timestamp=timestamp, direction=PANEL_DIRECTIONS[panel]))
@@ -103,7 +115,7 @@ def _parse_chart(notes_block: str, bpm_changes: tuple[tuple[float, float], ...],
                     index = holds.pop(panel)
                     head = notes[index]
                     notes[index] = Note(head.timestamp, head.direction, timestamp)
-    return Chart(difficulty=fields[2].strip(), meter=meter, notes=tuple(notes))
+    return Chart(difficulty=fields[2].strip(), meter=meter, notes=tuple(sorted(notes, key=lambda note: note.timestamp)))
 
 
 def _note_rows(measure: str) -> list[str]:
