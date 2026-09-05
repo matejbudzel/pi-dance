@@ -200,6 +200,32 @@ Left/Right moves focus, START confirms and begins the countdown, and SELECT open
 the same song-exit confirmation used during play. Cancelling preserves focus.
 Songs with one chart go straight to the countdown.
 
+To copy prepared songs to the Pi, use the runtime-only rsync script. Provide
+the local song directory first and an rsync destination second:
+
+```bash
+python3 scripts/sync_songs.py ~/pi-dance-songs matej@raspberrypi:/home/matej/pi-dance-songs/ --dry-run
+python3 scripts/sync_songs.py ~/pi-dance-songs matej@raspberrypi:/home/matej/pi-dance-songs/
+```
+
+A local destination directory or an SSH host alias also works. Install rsync 3
+or newer on both machines; on macOS, use `brew install rsync` and ensure that
+version is on your `PATH`. SSH authentication uses your normal SSH configuration.
+
+The script reads each bundle's `song.json` and copies that metadata plus the
+referenced WAV, `.sm` chart, and cover (normally `song.wav` and `song.bmp`).
+Custom filenames and nested paths in metadata are respected. Missing covers use
+the fallback asset installed with the game. Original compressed audio, extra
+images/charts, source-link text files, `list.txt`, and `.ziv-cache` are omitted.
+Incomplete or invalid bundles with metadata stop the transfer before rsync runs;
+directories without metadata are skipped.
+
+Reruns transfer new or changed files using rsync's usual size/modification-time
+checks. Destination files are not deleted, and the source is retained. This
+copies only the song library: install the game separately on the Pi and point
+its `[songs] directory` at the destination. The destination's parent directory
+must already exist.
+
 ## Chart philosophy
 
 The MVP should support only the useful subset of StepMania charts rather than attempting complete StepMania compatibility.
