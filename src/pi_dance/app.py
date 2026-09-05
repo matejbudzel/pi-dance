@@ -91,6 +91,8 @@ class App:
         self.gameplay_base: pygame.Surface | None = None
         self.gameplay_base_song: Song | None = None
         self.gameplay_needs_full_restore = False
+        self.gameplay_dynamic_rectangles: list[pygame.Rect] = []
+        self.gameplay_present_rectangles: list[pygame.Rect] = []
         self._last_visual_signature: tuple[object, ...] | None = None
 
     def run(self) -> None:
@@ -248,6 +250,7 @@ class App:
         self.gameplay_base = None
         self.gameplay_base_song = None
         self.gameplay_needs_full_restore = False
+        self.gameplay_dynamic_rectangles = []
         self.session = Session(self.active_chart.notes)
         self.feedback = None
         self.playback_started = False
@@ -292,6 +295,8 @@ class App:
         self.result_stars = 0
         self.gameplay_base = None
         self.gameplay_base_song = None
+        self.gameplay_dynamic_rectangles = []
+        self.gameplay_present_rectangles = []
 
     def _show_debug_result(self, stars: int) -> None:
         pygame.mixer.music.stop()
@@ -334,7 +339,11 @@ class App:
                 if self.gameplay_needs_full_restore:
                     self.screen.blit(self.gameplay_base, (0, 0))
                     self.gameplay_needs_full_restore = False
-                views.render_cached_gameplay(self.screen, self.gameplay_base, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms, countdown)
+                    self.gameplay_dynamic_rectangles = []
+                    self.gameplay_present_rectangles = [pygame.Rect(0, 0, APP_WIDTH, APP_HEIGHT)]
+                self.gameplay_dynamic_rectangles, restored_rectangles = views.render_cached_gameplay(self.screen, self.gameplay_base, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms, countdown, self.gameplay_dynamic_rectangles)
+                if restored_rectangles:
+                    self.gameplay_present_rectangles = restored_rectangles
             else:
                 views.render_gameplay(self.screen, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms)
                 if countdown is not None:
@@ -362,13 +371,7 @@ class App:
         if signature != self._last_visual_signature:
             dirty = [full_screen]
         elif self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING):
-            dirty = [
-                views.GAMEPLAY_LANES_RECT,
-                views.GAMEPLAY_PROGRESS_RECT,
-                views.GAMEPLAY_FEEDBACK_RECT,
-            ]
-            if self.current_screen is Screen.COUNTDOWN:
-                dirty.append(views.GAMEPLAY_COUNTDOWN_RECT)
+            dirty = self.gameplay_present_rectangles
         elif self.current_screen is Screen.RESULT:
             dirty = [pygame.Rect(220, 200, 500, 160)]
         else:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import pygame
 
 from .assets import Assets
+from .charts import Note
 from .config import APP_HEIGHT, APP_WIDTH, FOREGROUND, SETTINGS
 from .gameplay import Judgement, Session
 from .performance import FrameTiming
@@ -97,18 +98,19 @@ def render_gameplay_base(screen: pygame.Surface, assets: Assets, song: Song) -> 
         screen.blit(receptor, receptor.get_rect(center=center))
 
 
-def render_cached_gameplay(screen: pygame.Surface, base: pygame.Surface, assets: Assets, song: Song, session: Session | None, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int, countdown: int | None) -> None:
-    """Restore changing areas from a native surface, then paint only live UI."""
-    for rect in (GAMEPLAY_PROGRESS_RECT, GAMEPLAY_LANES_RECT, GAMEPLAY_FEEDBACK_RECT):
+def render_cached_gameplay(screen: pygame.Surface, base: pygame.Surface, assets: Assets, song: Song, session: Session | None, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int, countdown: int | None, previous_rectangles: list[pygame.Rect]) -> tuple[list[pygame.Rect], list[pygame.Rect]]:
+    """Restore only former/current moving artwork, then paint live gameplay."""
+    current_rectangles = _gameplay_dynamic_rectangles(assets, session, song_seconds, feedback, feedback_until, glow_until, now_ms, countdown)
+    restored_rectangles = _merge_rectangles(previous_rectangles + current_rectangles)
+    for rect in restored_rectangles:
         screen.blit(base, rect.topleft, rect)
-    if countdown is not None:
-        screen.blit(base, GAMEPLAY_COUNTDOWN_RECT.topleft, GAMEPLAY_COUNTDOWN_RECT)
-    _render_gameplay_dynamic(screen, assets, session, song, audio_seconds, song_seconds, feedback, feedback_until, glow_until, now_ms, receptors_are_static=True)
+    _render_gameplay_dynamic(screen, assets, session, song, audio_seconds, song_seconds, feedback, feedback_until, glow_until, now_ms)
     if countdown is not None:
         render_countdown(screen, assets, countdown)
+    return current_rectangles, restored_rectangles
 
 
-def _render_gameplay_dynamic(screen: pygame.Surface, assets: Assets, session: Session | None, song: Song, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int, receptors_are_static: bool = False) -> None:
+def _render_gameplay_dynamic(screen: pygame.Surface, assets: Assets, session: Session | None, song: Song, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int) -> None:
     _render_gameplay_progress(screen, song, audio_seconds)
     _render_flowing_notes(screen, assets, session, song_seconds)
     for index, direction in enumerate(LANE_DIRECTIONS):
@@ -117,9 +119,8 @@ def _render_gameplay_dynamic(screen: pygame.Surface, assets: Assets, session: Se
         if glowing:
             glow = assets.receptor_glows[direction]
             screen.blit(glow, glow.get_rect(center=center))
-        if not receptors_are_static or glowing:
-            receptor = assets.receptors[direction]
-            screen.blit(receptor, receptor.get_rect(center=center))
+        receptor = assets.receptors[direction]
+        screen.blit(receptor, receptor.get_rect(center=center))
     if feedback is not None and song_seconds <= feedback_until:
         screen.blit(assets.feedback_patches[feedback], GAMEPLAY_FEEDBACK_RECT.topleft)
 
@@ -132,7 +133,8 @@ def render_countdown(screen: pygame.Surface, assets: Assets, remaining: int) -> 
 def render_result(screen: pygame.Surface, assets: Assets, song: Song | None, audio_seconds: float, stars: int, started_at: int, now_ms: int) -> None:
     if song is None:
         return
-    _render_gameplay_header(screen, assets, song, audio_seconds)
+    _render_gameplay_header_static(screen, assets, song)
+    _render_gameplay_progress(screen, song, audio_seconds)
     star_y, star_spacing, star_start_x = 222, 40, 253
     for index in range(5):
         screen.blit(assets.draft_star, (star_start_x + index * star_spacing, star_y))
@@ -212,7 +214,7 @@ def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Sessi
     screen.set_clip(previous_clip)
 
 
-def _render_next_note_marker(screen: pygame.Surface, session: Session, song_seconds: float, next_note: object | None = None) -> None:
+def _render_next_note_marker(screen: pygame.Surface, session: Session, song_seconds: float, next_note: Note | None = None) -> None:
     if next_note is None:
         next_note = next((note for note in session.pending if note.timestamp > song_seconds), None)
     if next_note is None:
@@ -220,6 +222,67 @@ def _render_next_note_marker(screen: pygame.Surface, session: Session, song_seco
     center_x = LANE_START_X + LANE_DIRECTIONS.index(next_note.direction) * LANE_SPACING
     for offset, color in zip((-5, 0, 5), ((255, 75, 125), (255, 225, 70), (55, 225, 255))):
         pygame.draw.circle(screen, color, (center_x + offset, APP_HEIGHT - 14), 3)
+
+
+def _gameplay_dynamic_rectangles(assets: Assets, session: Session | None, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int, countdown: int | None) -> list[pygame.Rect]:
+    rectangles = [GAMEPLAY_PROGRESS_RECT]
+    rectangles.extend(_flowing_note_rectangles(assets, session, song_seconds))
+    for index, direction in enumerate(LANE_DIRECTIONS):
+        if now_ms <= glow_until[direction]:
+            glow = assets.receptor_glows[direction]
+            rectangles.append(glow.get_rect(center=(LANE_START_X + index * LANE_SPACING, 132)))
+    if feedback is not None and song_seconds <= feedback_until:
+        rectangles.append(GAMEPLAY_FEEDBACK_RECT)
+    if countdown is not None:
+        rectangles.append(GAMEPLAY_COUNTDOWN_RECT)
+    return _merge_rectangles(rectangles)
+
+
+def _flowing_note_rectangles(assets: Assets, session: Session | None, song_seconds: float) -> list[pygame.Rect]:
+    if session is None:
+        return []
+    clip = pygame.Rect(0, HEADER_HEIGHT, APP_WIDTH, APP_HEIGHT - HEADER_HEIGHT)
+    rectangles: list[pygame.Rect] = []
+    has_visible_note = False
+    next_note: Note | None = None
+    for note in session.pending:
+        seconds_until_note = note.timestamp - song_seconds
+        if seconds_until_note < -0.25:
+            continue
+        if seconds_until_note > NOTE_TRAVEL_SECONDS:
+            next_note = note
+            break
+        lane = LANE_DIRECTIONS.index(note.direction)
+        y = 132 + seconds_until_note * (APP_HEIGHT + 16 - 132) / NOTE_TRAVEL_SECONDS
+        arrow = assets.flow_arrows[note.direction]
+        rectangle = arrow.get_rect(center=(LANE_START_X + lane * LANE_SPACING, round(y))).clip(clip)
+        if rectangle.width and rectangle.height:
+            rectangles.append(rectangle)
+            has_visible_note = True
+    if not has_visible_note:
+        if next_note is None:
+            next_note = next((note for note in session.pending if note.timestamp > song_seconds), None)
+        if next_note is not None:
+            center_x = LANE_START_X + LANE_DIRECTIONS.index(next_note.direction) * LANE_SPACING
+            rectangles.append(pygame.Rect(center_x - 8, APP_HEIGHT - 22, 16, 16))
+    return rectangles
+
+
+def _merge_rectangles(rectangles: list[pygame.Rect]) -> list[pygame.Rect]:
+    merged: list[pygame.Rect] = []
+    for rectangle in rectangles:
+        rectangle = rectangle.clip(pygame.Rect(0, 0, APP_WIDTH, APP_HEIGHT))
+        if not rectangle.width or not rectangle.height:
+            continue
+        index = 0
+        while index < len(merged):
+            if rectangle.colliderect(merged[index]):
+                rectangle = rectangle.union(merged.pop(index))
+                index = 0
+            else:
+                index += 1
+        merged.append(rectangle)
+    return merged
 
 
 def _render_exit_item(screen: pygame.Surface, assets: Assets, selected: int, exit_index: int, y: int) -> None:
