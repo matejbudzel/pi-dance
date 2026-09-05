@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 import shutil
+import shlex
+import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
@@ -27,6 +29,49 @@ def make_library(root: Path) -> Path:
 
 
 class SyncSongsTests(unittest.TestCase):
+    def test_remote_locations_and_remote_to_remote_rejection(self):
+        self.assertEqual(sync_songs.remote_location("matej@devbox:/home/matej/pi-dance-songs"),
+                         ("matej@devbox", "/home/matej/pi-dance-songs"))
+        self.assertIsNone(sync_songs.remote_location("/tmp/local:songs"))
+        self.assertEqual(sync_songs.remote_location("matej@[::1]:songs"), ("matej@[::1]", "songs"))
+        with patch.object(sync_songs.subprocess, "run") as run:
+            with self.assertRaisesRegex(ValueError, "one end"):
+                sync_songs.sync_songs("devbox:/songs", "pi:/songs")
+            run.assert_not_called()
+
+    @unittest.skipUnless(shutil.which("rsync"), "requires rsync")
+    def test_pull_runs_remote_scanner_and_transfers_only_runtime_files(self):
+        with TemporaryDirectory(prefix="song's library ") as temporary:
+            root = Path(temporary)
+            source = make_library(root)
+            destination = root / "destination"
+            real_run = subprocess.run
+
+            def local_transport(command, **kwargs):
+                if command[0] == "ssh":
+                    self.assertEqual(command[:3], ["ssh", "--", "matej@devbox"])
+                    worker = shlex.split(command[3])
+                    self.assertEqual(worker, ["python3", "-", "--manifest", str(source)])
+                    # Execute exactly the script sent to SSH, using a local Python.
+                    return real_run([sys.executable, *worker[1:]], **kwargs)
+                self.assertEqual(command[0], "rsync")
+                self.assertEqual(command[-2], f"matej@devbox:{source}/")
+                return real_run([*command[:-2], str(source) + "/", command[-1]], **kwargs)
+
+            with patch.object(sync_songs.subprocess, "run", side_effect=local_transport):
+                self.assertEqual(sync_songs.sync_songs(f"matej@devbox:{source}", str(destination), True), 0)
+                self.assertFalse(destination.exists())
+                self.assertEqual(sync_songs.sync_songs(f"matej@devbox:{source}", str(destination)), 0)
+            copied = {path.relative_to(destination) for path in destination.rglob("*") if path.is_file()}
+            self.assertEqual(copied, set(sync_songs.runtime_files(source)))
+
+    def test_failed_remote_scan_does_not_start_rsync(self):
+        with patch.object(sync_songs.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "ssh")) as run:
+            with self.assertRaises(subprocess.CalledProcessError):
+                sync_songs.sync_songs("devbox:/missing", "/tmp/destination")
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.args[0][0], "ssh")
+
     def test_manifest_follows_metadata_and_allows_missing_cover(self):
         with TemporaryDirectory() as temporary:
             source = make_library(Path(temporary))

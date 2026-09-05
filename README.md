@@ -201,12 +201,24 @@ the same song-exit confirmation used during play. Cancelling preserves focus.
 Songs with one chart go straight to the countdown.
 
 To copy prepared songs to the Pi, use the runtime-only rsync script. Provide
-the local song directory first and an rsync destination second:
+the source song directory first and an rsync destination second. Either end
+can be remote over SSH; at least one end must be local:
 
 ```bash
 python3 scripts/sync_songs.py ~/pi-dance-songs matej@raspberrypi:/home/matej/pi-dance-songs/ --dry-run
 python3 scripts/sync_songs.py ~/pi-dance-songs matej@raspberrypi:/home/matej/pi-dance-songs/
 ```
+
+You can also run it on the receiving machine to pull songs from your desktop:
+
+```bash
+python3 scripts/sync_songs.py matej@devbox:/home/matej/pi-dance-songs ~/pi-dance-songs/ --dry-run
+python3 scripts/sync_songs.py matej@devbox:/home/matej/pi-dance-songs ~/pi-dance-songs/
+```
+
+For a remote source, the script runs its metadata scanner over SSH before
+starting rsync. That source machine needs Python 3.11+ but does not need the
+game or this script installed. Dry runs scan metadata without copying songs.
 
 A local destination directory or an SSH host alias also works. Install rsync 3
 or newer on both machines; on macOS, use `brew install rsync` and ensure that
