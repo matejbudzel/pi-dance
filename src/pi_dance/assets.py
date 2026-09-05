@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 
-from .config import FONT_PATH, FOREGROUND, TITLE
+from .config import BACKGROUND, FONT_PATH, FOREGROUND, TITLE
 from .gameplay import Judgement
 from .songs import Song
 
@@ -23,6 +23,7 @@ class Assets:
         self.flow_arrows = self._load_rotated("arrow-flow.png")
         self.receptor_glows = {direction: pygame.transform.scale(arrow, (42, 42)) for direction, arrow in self.flow_arrows.items()}
         self.feedback_icons = self._load_feedback_icons()
+        self.feedback_patches = self._make_feedback_patches(canvas)
         self.draft_star, self.earned_star = self._load_result_stars()
         self.covers = {
             song.path: pygame.transform.scale(pygame.image.load(song.cover_path).convert(canvas), (256, 256))
@@ -56,6 +57,16 @@ class Assets:
         earned = star.copy()
         earned.fill((255, 220, 45), special_flags=pygame.BLEND_RGBA_MULT)
         return draft, earned
+
+    def _make_feedback_patches(self, canvas: pygame.Surface) -> dict[Judgement, pygame.Surface]:
+        """Pre-compose large transparent feedback art for the RGB565 game canvas."""
+        patches: dict[Judgement, pygame.Surface] = {}
+        for judgement, icon in self.feedback_icons.items():
+            patch = pygame.Surface((170, 145), depth=canvas.get_bitsize(), masks=canvas.get_masks())
+            patch.fill(BACKGROUND)
+            patch.blit(icon, icon.get_rect(midtop=(75, 4)))
+            patches[judgement] = patch
+        return patches
 
     def _make_rainbow_title(self) -> pygame.Surface:
         colors = ((75, 255, 105), (255, 235, 60), (60, 230, 255), (85, 125, 255), (235, 85, 255), (255, 85, 125))

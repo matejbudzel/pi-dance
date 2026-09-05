@@ -103,26 +103,25 @@ def render_cached_gameplay(screen: pygame.Surface, base: pygame.Surface, assets:
         screen.blit(base, rect.topleft, rect)
     if countdown is not None:
         screen.blit(base, GAMEPLAY_COUNTDOWN_RECT.topleft, GAMEPLAY_COUNTDOWN_RECT)
-    _render_gameplay_dynamic(screen, assets, session, song, audio_seconds, song_seconds, feedback, feedback_until, glow_until, now_ms)
+    _render_gameplay_dynamic(screen, assets, session, song, audio_seconds, song_seconds, feedback, feedback_until, glow_until, now_ms, receptors_are_static=True)
     if countdown is not None:
         render_countdown(screen, assets, countdown)
 
 
-def _render_gameplay_dynamic(screen: pygame.Surface, assets: Assets, session: Session | None, song: Song, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int) -> None:
+def _render_gameplay_dynamic(screen: pygame.Surface, assets: Assets, session: Session | None, song: Song, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int, receptors_are_static: bool = False) -> None:
     _render_gameplay_progress(screen, song, audio_seconds)
     _render_flowing_notes(screen, assets, session, song_seconds)
     for index, direction in enumerate(LANE_DIRECTIONS):
         center = (LANE_START_X + index * LANE_SPACING, 132)
-        if now_ms <= glow_until[direction]:
+        glowing = now_ms <= glow_until[direction]
+        if glowing:
             glow = assets.receptor_glows[direction]
             screen.blit(glow, glow.get_rect(center=center))
-        # The static receptor is already in the cached background.  Blit it
-        # again here only for normal (non-cached) rendering, after a glow.
-        receptor = assets.receptors[direction]
-        screen.blit(receptor, receptor.get_rect(center=center))
+        if not receptors_are_static or glowing:
+            receptor = assets.receptors[direction]
+            screen.blit(receptor, receptor.get_rect(center=center))
     if feedback is not None and song_seconds <= feedback_until:
-        icon = assets.feedback_icons[feedback]
-        screen.blit(icon, icon.get_rect(midtop=(FEEDBACK_CENTER_X, 104)))
+        screen.blit(assets.feedback_patches[feedback], GAMEPLAY_FEEDBACK_RECT.topleft)
 
 
 def render_countdown(screen: pygame.Surface, assets: Assets, remaining: int) -> None:
@@ -194,10 +193,14 @@ def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Sessi
     previous_clip = screen.get_clip()
     screen.set_clip(pygame.Rect(0, HEADER_HEIGHT, APP_WIDTH, APP_HEIGHT - HEADER_HEIGHT))
     has_visible_note = False
+    next_note = None
     for note in session.pending:
         seconds_until_note = note.timestamp - song_seconds
-        if not -0.25 <= seconds_until_note <= NOTE_TRAVEL_SECONDS:
+        if seconds_until_note < -0.25:
             continue
+        if seconds_until_note > NOTE_TRAVEL_SECONDS:
+            next_note = note
+            break
         lane = LANE_DIRECTIONS.index(note.direction)
         y = 132 + seconds_until_note * (APP_HEIGHT + 16 - 132) / NOTE_TRAVEL_SECONDS
         if HEADER_HEIGHT <= y <= APP_HEIGHT + 16:
@@ -205,12 +208,13 @@ def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Sessi
             screen.blit(arrow, arrow.get_rect(center=(LANE_START_X + lane * LANE_SPACING, round(y))))
             has_visible_note = True
     if not has_visible_note:
-        _render_next_note_marker(screen, session, song_seconds)
+        _render_next_note_marker(screen, session, song_seconds, next_note)
     screen.set_clip(previous_clip)
 
 
-def _render_next_note_marker(screen: pygame.Surface, session: Session, song_seconds: float) -> None:
-    next_note = next((note for note in session.pending if note.timestamp > song_seconds), None)
+def _render_next_note_marker(screen: pygame.Surface, session: Session, song_seconds: float, next_note: object | None = None) -> None:
+    if next_note is None:
+        next_note = next((note for note in session.pending if note.timestamp > song_seconds), None)
     if next_note is None:
         return
     center_x = LANE_START_X + LANE_DIRECTIONS.index(next_note.direction) * LANE_SPACING
