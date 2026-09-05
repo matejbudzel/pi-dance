@@ -22,6 +22,10 @@ COVER_X = APP_WIDTH - 40 - COVER_SIZE
 COVER_Y = 118
 GAMEPLAY_COVER_POSITION = (16, 108)
 FEEDBACK_CENTER_X = (LANE_START_X + (len(LANE_DIRECTIONS) - 1) * LANE_SPACING + 16 + APP_WIDTH) // 2
+GAMEPLAY_PROGRESS_RECT = pygame.Rect(40, 16, APP_WIDTH - 80, 12)
+GAMEPLAY_LANES_RECT = pygame.Rect(LANE_START_X - 28, HEADER_HEIGHT, LANE_SPACING * 3 + 56, APP_HEIGHT - HEADER_HEIGHT)
+GAMEPLAY_FEEDBACK_RECT = pygame.Rect(660, 100, 170, 145)
+GAMEPLAY_COUNTDOWN_RECT = pygame.Rect(APP_WIDTH // 2 - 70, APP_HEIGHT // 2 - 70, 140, 140)
 
 
 def render_splash(screen: pygame.Surface, assets: Assets) -> None:
@@ -72,14 +76,48 @@ def render_application_exit_confirmation(screen: pygame.Surface, assets: Assets,
 def render_gameplay(screen: pygame.Surface, assets: Assets, song: Song | None, session: Session | None, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int) -> None:
     if song is None:
         return
-    _render_gameplay_header(screen, assets, song, audio_seconds)
+    render_gameplay_base(screen, assets, song)
+    _render_gameplay_dynamic(screen, assets, session, song, audio_seconds, song_seconds, feedback, feedback_until, glow_until, now_ms)
+
+
+def create_gameplay_base(screen: pygame.Surface, assets: Assets, song: Song) -> pygame.Surface:
+    """Build the parts of gameplay that do not change while a song is playing."""
+    base = screen.copy()
+    base.fill((0, 0, 0))
+    render_gameplay_base(base, assets, song)
+    return base
+
+
+def render_gameplay_base(screen: pygame.Surface, assets: Assets, song: Song) -> None:
+    _render_gameplay_header_static(screen, assets, song)
     screen.blit(assets.cover_for(song), GAMEPLAY_COVER_POSITION)
+    for index, direction in enumerate(LANE_DIRECTIONS):
+        center = (LANE_START_X + index * LANE_SPACING, 132)
+        receptor = assets.receptors[direction]
+        screen.blit(receptor, receptor.get_rect(center=center))
+
+
+def render_cached_gameplay(screen: pygame.Surface, base: pygame.Surface, assets: Assets, song: Song, session: Session | None, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int, countdown: int | None) -> None:
+    """Restore changing areas from a native surface, then paint only live UI."""
+    for rect in (GAMEPLAY_PROGRESS_RECT, GAMEPLAY_LANES_RECT, GAMEPLAY_FEEDBACK_RECT):
+        screen.blit(base, rect.topleft, rect)
+    if countdown is not None:
+        screen.blit(base, GAMEPLAY_COUNTDOWN_RECT.topleft, GAMEPLAY_COUNTDOWN_RECT)
+    _render_gameplay_dynamic(screen, assets, session, song, audio_seconds, song_seconds, feedback, feedback_until, glow_until, now_ms)
+    if countdown is not None:
+        render_countdown(screen, assets, countdown)
+
+
+def _render_gameplay_dynamic(screen: pygame.Surface, assets: Assets, session: Session | None, song: Song, audio_seconds: float, song_seconds: float, feedback: Judgement | None, feedback_until: float, glow_until: dict[str, int], now_ms: int) -> None:
+    _render_gameplay_progress(screen, song, audio_seconds)
     _render_flowing_notes(screen, assets, session, song_seconds)
     for index, direction in enumerate(LANE_DIRECTIONS):
         center = (LANE_START_X + index * LANE_SPACING, 132)
         if now_ms <= glow_until[direction]:
             glow = assets.receptor_glows[direction]
             screen.blit(glow, glow.get_rect(center=center))
+        # The static receptor is already in the cached background.  Blit it
+        # again here only for normal (non-cached) rendering, after a glow.
         receptor = assets.receptors[direction]
         screen.blit(receptor, receptor.get_rect(center=center))
     if feedback is not None and song_seconds <= feedback_until:
@@ -135,17 +173,19 @@ def render_confirmation_buttons(screen: pygame.Surface, assets: Assets, confirm:
         x += text.get_width() + gap
 
 
-def _render_gameplay_header(screen: pygame.Surface, assets: Assets, song: Song, audio_seconds: float) -> None:
+def _render_gameplay_header_static(screen: pygame.Surface, assets: Assets, song: Song) -> None:
     header_color = tuple(channel * 55 // 100 for channel in song.focus_color)
     pygame.draw.rect(screen, header_color, pygame.Rect(0, 0, APP_WIDTH, HEADER_HEIGHT))
-    progress = pygame.Rect(40, 16, APP_WIDTH - 80, 12)
-    pygame.draw.rect(screen, FOREGROUND, progress, width=2)
+    pygame.draw.rect(screen, FOREGROUND, GAMEPLAY_PROGRESS_RECT, width=2)
+    screen.blit(assets.list_font.render(song.title, False, FOREGROUND), (40, 42))
+
+
+def _render_gameplay_progress(screen: pygame.Surface, song: Song, audio_seconds: float) -> None:
     ratio = min(1.0, audio_seconds / song.duration_seconds)
     if ratio > 0:
-        fill = progress.copy()
-        fill.width = max(1, round(progress.width * ratio))
+        fill = GAMEPLAY_PROGRESS_RECT.copy()
+        fill.width = max(1, round(GAMEPLAY_PROGRESS_RECT.width * ratio))
         pygame.draw.rect(screen, FOREGROUND, fill)
-    screen.blit(assets.list_font.render(song.title, False, FOREGROUND), (40, 42))
 
 
 def _render_flowing_notes(screen: pygame.Surface, assets: Assets, session: Session | None, song_seconds: float) -> None:

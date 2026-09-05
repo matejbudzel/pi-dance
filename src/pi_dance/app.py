@@ -88,6 +88,8 @@ class App:
         self.show_performance_hud = False
         self.performance = PerformanceTracker()
         self.modal_snapshot: pygame.Surface | None = None
+        self.gameplay_base: pygame.Surface | None = None
+        self.gameplay_base_song: Song | None = None
         self._last_visual_signature: tuple[object, ...] | None = None
 
     def run(self) -> None:
@@ -242,6 +244,8 @@ class App:
         except (OSError, pygame.error, StopIteration, ValueError):
             return
         self.active_song = song
+        self.gameplay_base = None
+        self.gameplay_base_song = None
         self.session = Session(self.active_chart.notes)
         self.feedback = None
         self.playback_started = False
@@ -279,6 +283,8 @@ class App:
         self.feedback = None
         self.playback_started = False
         self.result_stars = 0
+        self.gameplay_base = None
+        self.gameplay_base_song = None
 
     def _show_debug_result(self, stars: int) -> None:
         pygame.mixer.music.stop()
@@ -294,7 +300,14 @@ class App:
                 views.render_performance_hud(self.screen, self.assets, self.performance.latest)
             return
 
-        self.screen.fill(BACKGROUND)
+        cached_gameplay = self.framebuffer is not None and self.current_screen in (
+            Screen.COUNTDOWN,
+            Screen.PLAYING,
+            Screen.PAUSED,
+            Screen.SONG_EXIT_CONFIRMATION,
+        )
+        if not cached_gameplay:
+            self.screen.fill(BACKGROUND)
         now_ms = pygame.time.get_ticks()
         if self.current_screen is Screen.SPLASH:
             views.render_splash(self.screen, self.assets)
@@ -305,10 +318,18 @@ class App:
         elif self.current_screen is Screen.RESULT:
             views.render_result(self.screen, self.assets, self.active_song, self._audio_position_seconds(), self.result_stars, self.result_started_at, now_ms)
         else:
-            views.render_gameplay(self.screen, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms)
-            if self.current_screen is Screen.COUNTDOWN:
-                views.render_countdown(self.screen, self.assets, self._countdown_remaining())
-            elif self.current_screen is Screen.PAUSED:
+            countdown = self._countdown_remaining() if self.current_screen is Screen.COUNTDOWN else None
+            if cached_gameplay and self.active_song is not None:
+                if self.gameplay_base is None or self.gameplay_base_song != self.active_song:
+                    self.gameplay_base = views.create_gameplay_base(self.screen, self.assets, self.active_song)
+                    self.gameplay_base_song = self.active_song
+                    self.screen.blit(self.gameplay_base, (0, 0))
+                views.render_cached_gameplay(self.screen, self.gameplay_base, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms, countdown)
+            else:
+                views.render_gameplay(self.screen, self.assets, self.active_song, self.session, self._audio_position_seconds(), self._song_position_seconds(), self.feedback, self.feedback_until, self.receptor_glow_until, now_ms)
+                if countdown is not None:
+                    views.render_countdown(self.screen, self.assets, countdown)
+            if self.current_screen is Screen.PAUSED:
                 views.render_modal(self.screen, self.assets, SETTINGS.pause_text)
             elif self.current_screen is Screen.SONG_EXIT_CONFIRMATION:
                 views.render_song_exit_confirmation(self.screen, self.assets, self.song_exit_confirmation_selected)
@@ -332,12 +353,12 @@ class App:
             dirty = [full_screen]
         elif self.current_screen in (Screen.COUNTDOWN, Screen.PLAYING):
             dirty = [
-                pygame.Rect(views.LANE_START_X - 28, views.HEADER_HEIGHT, views.LANE_SPACING * 3 + 56, APP_HEIGHT - views.HEADER_HEIGHT),
-                pygame.Rect(40, 16, APP_WIDTH - 80, 12),
-                pygame.Rect(660, 100, 170, 145),
+                views.GAMEPLAY_LANES_RECT,
+                views.GAMEPLAY_PROGRESS_RECT,
+                views.GAMEPLAY_FEEDBACK_RECT,
             ]
             if self.current_screen is Screen.COUNTDOWN:
-                dirty.append(pygame.Rect(APP_WIDTH // 2 - 70, APP_HEIGHT // 2 - 70, 140, 140))
+                dirty.append(views.GAMEPLAY_COUNTDOWN_RECT)
         elif self.current_screen is Screen.RESULT:
             dirty = [pygame.Rect(220, 200, 500, 160)]
         else:
